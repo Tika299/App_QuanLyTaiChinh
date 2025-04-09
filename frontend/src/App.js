@@ -195,11 +195,11 @@ function App() {
               <p>1000000đ</p>
             </div>
             <div className='box-money me-5'>
-              <h2>Thu</h2>
+              <h2 style={{color:'green'}}>Thu</h2>
               <p>1000000đ</p>
             </div>
             <div className='box-money'>
-              <h2>Chi</h2>
+              <h2 style={{color:'red'}}>Chi</h2>
               <p>1000000đ</p>
             </div>
           </div>
