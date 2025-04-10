@@ -44,7 +44,7 @@
 
 .wapper {
   flex: 1;
-  max-width: 1000px;
+  max-width: 87vw;
 }
 
 .my-css {
@@ -54,16 +54,18 @@
 }
 
 .my-btn {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   border: 1px solid #000 !important;
 }
 
 .d-flex.flex-column.flex-shrink-0.p-3.text-white.bg-dark {
-  height: 95vh;
+  position: relative;
+  top: 0;
+  bottom: 0;
 }
 
 .content {
-  padding: 30px;
+  padding: 20px 30px 0;
   flex: 1;
 }
 
