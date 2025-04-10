@@ -42,6 +42,11 @@
   justify-content: start;
 }
 
+.wapper {
+  flex: 1;
+  max-width: 1000px;
+}
+
 .my-css {
   flex-grow: 1;
   display: flex;
@@ -54,7 +59,7 @@
 }
 
 .d-flex.flex-column.flex-shrink-0.p-3.text-white.bg-dark {
-  height: 92vh;
+  height: 95vh;
 }
 
 .content {
