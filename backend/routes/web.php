@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CrudUserController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CrudUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,3 +20,18 @@ Route::get('/', function () {
 });
 
 
+<<<<<<< HEAD
+=======
+Route::get('/edit', [CrudUserController::class, 'edit'])->name('profile.edit');
+Route::post('/edit', [CrudUserController::class, 'update'])->name('profile.update');
+
+Route::get('/edit', function () {
+    return view('exe.edit');
+});
+
+Route::get('/user', [CrudUserController::class, 'show'])->name('profile.show');
+Route::get('/show', function () {
+    return view('exe.user');
+});
+
+>>>>>>> phi
