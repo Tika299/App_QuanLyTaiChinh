@@ -9,7 +9,7 @@ function Home() {
         series: [
             {
                 name: 'Desktops',
-                data: [10, 41, 35, 51, 49, 62, 69, 91, 148],
+                data: [10, 41, 35, 51, 49, 62, 69],
             },
         ],
         options: {
@@ -37,7 +37,7 @@ function Home() {
                 },
             },
             xaxis: {
-                categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+                categories: ['Mon', 'Tue', 'Wen', 'Thu' , 'Fri', 'Sad', 'Sun'],
             },
         },
     });
