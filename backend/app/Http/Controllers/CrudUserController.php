@@ -2,16 +2,12 @@
 
 namespace App\Http\Controllers;
 
-<<<<<<< HEAD
-// use App\Models\User;
-// use Hash;
-// use Illuminate\Http\Request;
-// use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 
 class CrudUserController extends Controller
@@ -75,14 +71,8 @@ class CrudUserController extends Controller
 
         return response()->json([
             'message' => 'Đăng xuất thành công!'
-        ]);
-=======
-use Illuminate\Http\Request;
-use App\Models\User;
-use Illuminate\Validation\Rule;
+        ]);}
 
-class CrudUserController extends Controller
-{
     public function edit()
     {
         $user = User::find(1);
@@ -156,8 +146,6 @@ class CrudUserController extends Controller
     {
         $user = User::find(1); // hoặc Auth::user() nếu dùng auth
         return view('exe.user', compact('user'));
->>>>>>> phi
     }
-
 
 }
