@@ -89,3 +89,10 @@
   justify-content: end;
   align-items: center;
 }
+
+.btn-add {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  border-radius: 50%;
+}
