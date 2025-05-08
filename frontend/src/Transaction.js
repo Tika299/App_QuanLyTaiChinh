@@ -1,16 +1,12 @@
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import Header from './Header';
 import Slider from './Slider';
 
 function Transaction() {
-
-    const [giaoDich, setGiaoDich] = useState([
-        { id: 1, ten: 'Mua sắm thực phẩm', soTien: -500000, danhMuc: 'Chi tiêu', ngay: '2025-04-20', moTa: 'Mua thực phẩm hàng tuần' },
-        { id: 2, ten: 'Lương tháng', soTien: 20000000, danhMuc: 'Thu nhập', ngay: '2025-04-15', moTa: 'Lương tháng 4' },
-        { id: 3, ten: 'Hóa đơn điện', soTien: -1000000, danhMuc: 'Chi tiêu', ngay: '2025-04-10', moTa: 'Hóa đơn điện tháng 4' },
-    ]);
+    const [giaoDich, setGiaoDich] = useState([]);
     const [locDanhMuc, setLocDanhMuc] = useState('Tất cả');
     const [locNgay, setLocNgay] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -24,6 +20,32 @@ function Transaction() {
     const [loi, setLoi] = useState('');
 
     const danhMuc = ['Tất cả', 'Thu nhập', 'Chi tiêu'];
+
+    // Hàm lấy danh sách giao dịch từ API
+    const fetchTransactions = async () => {
+        try {
+            const params = {};
+            if (locDanhMuc !== 'Tất cả') {
+                params.danhMuc = locDanhMuc;
+            }
+            if (locNgay !== '') {
+                params.ngay = locNgay;
+            }
+
+            const response = await axios.get('http://localhost:8000/api/transactions', {
+                params,
+            });
+            setGiaoDich(response.data);
+        } catch (error) {
+            console.error('Lỗi khi lấy giao dịch:', error);
+            setLoi(error.response?.data?.error || 'Không thể tải danh sách giao dịch');
+        }
+    };
+
+    // Gọi API khi component mount hoặc khi bộ lọc thay đổi
+    useEffect(() => {
+        fetchTransactions();
+    }, [locDanhMuc, locNgay]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -47,7 +69,7 @@ function Transaction() {
         return '';
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const loiValidate = validateForm();
         if (loiValidate) {
@@ -55,36 +77,21 @@ function Transaction() {
             return;
         }
 
-        // Thêm giao dịch mới
-        const newTransaction = {
-            id: giaoDich.length + 1,
-            ...formData,
-            soTien: parseFloat(formData.soTien),
-        };
-        setGiaoDich([...giaoDich, newTransaction]);
-        alert('Giao dịch đã được thêm thành công!');
-
-        // Đóng modal và reset form
-        setShowModal(false);
-        setFormData({
-            ten: '',
-            soTien: '',
-            danhMuc: 'Chi tiêu',
-            ngay: '',
-            moTa: '',
-        });
-        setLoi('');
+        try {
+            const response = await axios.post('http://localhost:8000/api/transactions', formData);
+            setGiaoDich([...giaoDich, response.data]);
+            alert('Giao dịch đã được thêm thành công!');
+            setShowModal(false);
+            setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+            setLoi('');
+        } catch (error) {
+            setLoi(error.response?.data?.error || 'Lỗi khi thêm giao dịch');
+        }
     };
 
     const handleCloseModal = () => {
         setShowModal(false);
-        setFormData({
-            ten: '',
-            soTien: '',
-            danhMuc: 'Chi tiêu',
-            ngay: '',
-            moTa: '',
-        });
+        setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
         setLoi('');
     };
 
@@ -98,29 +105,34 @@ function Transaction() {
         alert(`Chuyển đến trang Sửa Giao dịch cho ID: ${id}`);
     };
 
-    const xuLyXoaGiaoDich = (id) => {
+    const xuLyXoaGiaoDich = async (id) => {
         if (window.confirm('Bạn có chắc chắn muốn xóa giao dịch này không?')) {
-            setGiaoDich(giaoDich.filter((gd) => gd.id !== id));
+            try {
+                await axios.delete(`http://localhost:8000/api/transactions/${id}`);
+                setGiaoDich(giaoDich.filter((gd) => gd.id !== id));
+                alert('Giao dịch đã được xóa thành công!');
+            } catch (error) {
+                setLoi(error.response?.data?.error || 'Lỗi khi xóa giao dịch');
+            }
         }
     };
 
-    const xuLyXemChiTiet = (id) => {
-        alert(`Chuyển đến trang Chi tiết Giao dịch cho ID: ${id}`);
+    const xuLyXemChiTiet = async (id) => {
+        try {
+            const response = await axios.get(`http://localhost:8000/api/transactions/${id}`);
+            alert(JSON.stringify(response.data, null, 2));
+        } catch (error) {
+            setLoi(error.response?.data?.error || 'Lỗi khi xem chi tiết giao dịch');
+        }
     };
-
-    const giaoDichDaLoc = giaoDich.filter((gd) => {
-        const khopDanhMuc = locDanhMuc === 'Tất cả' || gd.danhMuc === locDanhMuc;
-        const khopNgay = locNgay === '' || gd.ngay.includes(locNgay);
-        return khopDanhMuc && khopNgay;
-    });
 
     return (
         <div className="d-flex">
-            {<Slider />}
-            <div className='wapper'>
-                {<Header />}
-                <main className='d-flex'>
-                    <div className='content'>
+            <Slider />
+            <div className="wapper">
+                <Header />
+                <main className="d-flex">
+                    <div className="content">
                         <div className="container-fluid py-4 bg-light min-vh-100">
                             <div className="container">
                                 <h1 className="mb-4 fw-bold">Quản lý Giao dịch</h1>
@@ -168,6 +180,13 @@ function Transaction() {
                                     </div>
                                 </div>
 
+                                {/* Thông báo lỗi */}
+                                {loi && (
+                                    <div className="alert alert-danger" role="alert">
+                                        {loi}
+                                    </div>
+                                )}
+
                                 {/* Danh sách Giao dịch */}
                                 <div className="card">
                                     <div className="card-body p-0">
@@ -183,10 +202,10 @@ function Transaction() {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {giaoDichDaLoc.map((giaoDich) => (
+                                                    {giaoDich.map((giaoDich) => (
                                                         <tr key={giaoDich.id}>
                                                             <td>{giaoDich.ten}</td>
-                                                            <td className={giaoDich.soTien >= 0 ? 'text-success' : 'text-danger'}>
+                                                            <td className={giaoDich.danhMuc === "Thu nhập" ? 'text-success' : 'text-danger'}>
                                                                 {Math.abs(giaoDich.soTien).toLocaleString('vi-VN')} VNĐ
                                                             </td>
                                                             <td>{giaoDich.danhMuc}</td>
@@ -320,7 +339,7 @@ function Transaction() {
                 </main>
             </div>
         </div>
-    )
+    );
 }
 
 export default Transaction;
