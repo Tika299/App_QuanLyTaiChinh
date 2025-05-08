@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CrudUserController;
 use Illuminate\Support\Facades\Password;
 use App\Http\Controllers\TransactionController;
+use Illuminate\Support\Facades\Hash;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,9 +25,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::post('/login', [CrudUserController::class, 'login']);
 
-Route::post('/signup',[CrudUserController::class,'signup'])->name('user.sigup');
+Route::post('/signup', [CrudUserController::class, 'signup'])->name('user.sigup');
 
-Route::post('/logout',[CrudUserController::class,'logout'])->name('logout');
+Route::post('/logout', [CrudUserController::class, 'logout'])->name('logout');
 
 Route::post('/forgot-password', function (Illuminate\Http\Request $request) {
     $request->validate(['email' => 'required|email']);
@@ -36,8 +37,8 @@ Route::post('/forgot-password', function (Illuminate\Http\Request $request) {
     );
 
     return $status === Password::RESET_LINK_SENT
-                ? response()->json(['message' => __($status)])
-                : response()->json(['message' => __($status)], 400);
+        ? response()->json(['message' => __($status)])
+        : response()->json(['message' => __($status)], 400);
 });
 
 
@@ -58,15 +59,15 @@ Route::post('/reset-password', function (Illuminate\Http\Request $request) {
     );
 
     return $status === Password::PASSWORD_RESET
-                ? response()->json(['message' => __($status)])
-                : response()->json(['message' => __($status)], 400);
+        ? response()->json(['message' => __($status)])
+        : response()->json(['message' => __($status)], 400);
 });
 
 
 //Crud Transaction
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('/transactions', [TransactionController::class, 'index']);
-    Route::post('/transactions', [TransactionController::class, 'store']);
-    Route::put('/transactions/{id}', [TransactionController::class, 'update']);
-    Route::delete('/transactions/{id}', [TransactionController::class, 'destroy']);
-});
+// Route::middleware(['auth:sanctum'])->group(function () {
+// });
+Route::get('/transactions', [TransactionController::class, 'index']);
+Route::post('/transactions', [TransactionController::class, 'store']);
+Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+Route::delete('/transactions/{id}', [TransactionController::class, 'destroy']);

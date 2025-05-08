@@ -12,14 +12,15 @@ return new class extends Migration {
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('username')->unique(); // thêm username
-            $table->string('email')->unique();    // email đã có sẵn
-            $table->timestamp('email_verified_at')->nullable(); // có thể giữ hoặc xóa nếu không dùng
+            $table->string('username')->unique();
+            $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['user', 'admin'])->default('user'); // thêm role
-            $table->string('avatar')->default('default.png'); // thêm avatar
-            $table->rememberToken(); // dùng cho tính năng "remember me"
-            $table->timestamps(); // created_at + updated_at
+            $table->enum('role', ['user', 'admin'])->default('user');
+            $table->string('avatar')->default('default.png');
+            $table->decimal('balance', 15, 2)->default(0); // Thêm cột balance
+            $table->rememberToken();
+            $table->timestamps();
         });
     }
 
