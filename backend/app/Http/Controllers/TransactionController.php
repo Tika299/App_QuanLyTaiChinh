@@ -75,7 +75,8 @@ class TransactionController extends Controller
 
             $ten = strtolower($request->ten);
             if ((str_contains($ten, 'thu') && $request->danhMuc === 'Chi tiêu') ||
-                (str_contains($ten, 'chi') && $request->danhMuc === 'Thu nhập')) {
+                (str_contains($ten, 'chi') && $request->danhMuc === 'Thu nhập')
+            ) {
                 return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
             }
 
@@ -102,18 +103,6 @@ class TransactionController extends Controller
         }
     }
 
-    public function destroy($id)
-    {
-        try {
-            $transaction = Transaction::where('user_id', 1)->findOrFail($id);
-            $transaction->delete();
-            return response()->json(['message' => 'Giao dịch đã được xóa']);
-        } catch (\Exception $e) {
-            Log::error('Lỗi trong destroy: ' . $e->getMessage());
-            return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
-        }
-    }
-
     public function show($id)
     {
         try {
@@ -128,6 +117,81 @@ class TransactionController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Lỗi trong show: ' . $e->getMessage());
+            return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            // Tìm giao dịch theo ID và user_id
+            $transaction = Transaction::where('user_id', 1)->findOrFail($id);
+
+            // Xác thực dữ liệu đầu vào
+            $validator = Validator::make($request->all(), [
+                'ten' => 'required|string|max:50',
+                'soTien' => 'required|numeric|gt:0',
+                'danhMuc' => 'required|in:Thu nhập,Chi tiêu',
+                'ngay' => 'required|date|before_or_equal:today',
+                'moTa' => 'nullable|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()->first()], 422);
+            }
+
+            // Kiểm tra danh mục
+            $userId = 1; // User_id mặc định
+            $category = Category::where('user_id', $userId)
+                ->where('type', $request->danhMuc === 'Thu nhập' ? 'income' : 'expense')
+                ->first();
+
+            if (!$category) {
+                return response()->json(['error' => 'Danh mục không tồn tại'], 404);
+            }
+
+            // Kiểm tra tính hợp lệ của tên và danh mục
+            $ten = strtolower($request->ten);
+            if ((str_contains($ten, 'thu') && $request->danhMuc === 'Chi tiêu') ||
+                (str_contains($ten, 'chi') && $request->danhMuc === 'Thu nhập')
+            ) {
+                return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
+            }
+
+            // Cập nhật giao dịch
+            $transaction->update([
+                'category_id' => $category->id,
+                'name' => $request->ten,
+                'amount' => $request->soTien,
+                'description' => $request->moTa,
+                'created_at' => $request->ngay,
+            ]);
+
+            // Lấy lại giao dịch với thông tin danh mục
+            $updatedTransaction = Transaction::where('user_id', 1)->with('category')->findOrFail($id);
+
+            return response()->json([
+                'id' => $updatedTransaction->id,
+                'ten' => $updatedTransaction->name,
+                'soTien' => $updatedTransaction->amount,
+                'danhMuc' => $updatedTransaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
+                'ngay' => $updatedTransaction->created_at->format('Y-m-d'),
+                'moTa' => $updatedTransaction->description,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Lỗi trong update: ' . $e->getMessage());
+            return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $transaction = Transaction::where('user_id', 1)->findOrFail($id);
+            $transaction->delete();
+            return response()->json(['message' => 'Giao dịch đã được xóa']);
+        } catch (\Exception $e) {
+            Log::error('Lỗi trong destroy: ' . $e->getMessage());
             return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
         }
     }

@@ -10,6 +10,15 @@ function Transaction() {
     const [locDanhMuc, setLocDanhMuc] = useState('Tất cả');
     const [locNgay, setLocNgay] = useState('');
     const [showModal, setShowModal] = useState(false);
+    const [showModalEdit, setShowModalEdit] = useState(false);
+    const [formDataEdit, setFormDataEdit] = useState({
+        id: null,
+        ten: '',
+        soTien: '',
+        danhMuc: 'Chi tiêu',
+        ngay: '',
+        moTa: '',
+    });
     const [formData, setFormData] = useState({
         ten: '',
         soTien: '',
@@ -49,12 +58,13 @@ function Transaction() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        setFormDataEdit({ ...formDataEdit, [name]: value });
         setFormData({ ...formData, [name]: value });
         setLoi('');
     };
 
-    const validateForm = () => {
-        const { ten, soTien, ngay, danhMuc } = formData;
+    const validateForm = (data) => {
+        const { ten, soTien, ngay, danhMuc } = data;
         const today = new Date().toISOString().split('T')[0];
 
         if (!ten) return 'Vui lòng nhập tên giao dịch';
@@ -71,26 +81,47 @@ function Transaction() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const loiValidate = validateForm();
+        const isEditing = !!formDataEdit.id;
+        const dataToValidate = isEditing ? formDataEdit : formData;
+        const loiValidate = validateForm(dataToValidate);
         if (loiValidate) {
             setLoi(loiValidate);
             return;
         }
 
         try {
-            const response = await axios.post('http://localhost:8000/api/transactions', formData);
-            setGiaoDich([...giaoDich, response.data]);
-            alert('Giao dịch đã được thêm thành công!');
-            setShowModal(false);
-            setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+            if (isEditing) {
+                // Update transaction
+                const response = await axios.put(
+                    `http://localhost:8000/api/transactions/${formDataEdit.id}`,
+                    formDataEdit
+                );
+                if (response.data) {
+                    setGiaoDich(giaoDich.map(gd => (gd.id === formDataEdit.id ? response.data : gd)));
+                    alert('Giao dịch đã được cập nhật thành công!');
+                    setShowModalEdit(false);
+                    setFormDataEdit({ id: null, ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+                } else {
+                    setLoi('Không nhận được dữ liệu từ server');
+                }
+            } else {
+                // Add new transaction
+                const response = await axios.post('http://localhost:8000/api/transactions', formData);
+                setGiaoDich([...giaoDich, response.data]);
+                alert('Giao dịch đã được thêm thành công!');
+                setShowModal(false);
+                setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+            }
             setLoi('');
         } catch (error) {
-            setLoi(error.response?.data?.error || 'Lỗi khi thêm giao dịch');
+            setLoi(error.response?.data?.error || `Lỗi khi ${isEditing ? 'cập nhật' : 'thêm'} giao dịch`);
         }
     };
 
     const handleCloseModal = () => {
         setShowModal(false);
+        setShowModalEdit(false);
+        setFormDataEdit({ id: null, ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
         setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
         setLoi('');
     };
@@ -101,8 +132,21 @@ function Transaction() {
         if (name === 'locNgay') setLocNgay(value);
     };
 
-    const xuLySuaGiaoDich = (id) => {
-        alert(`Chuyển đến trang Sửa Giao dịch cho ID: ${id}`);
+    const xuLySuaGiaoDich = async (id) => {
+        setShowModalEdit(true);
+        try {
+            const response = await axios.get(`http://localhost:8000/api/transactions/${id}`);
+            setFormDataEdit({
+                id: response.data.id,
+                ten: response.data.ten,
+                soTien: response.data.soTien,
+                danhMuc: response.data.danhMuc,
+                ngay: response.data.ngay,
+                moTa: response.data.moTa
+            });
+        } catch (error) {
+            setLoi(error.response?.data?.error || 'Lỗi khi lấy thông tin giao dịch');
+        }
     };
 
     const xuLyXoaGiaoDich = async (id) => {
@@ -238,7 +282,7 @@ function Transaction() {
                                     </div>
                                 </div>
 
-                                {/* Modal Thêm Giao dịch */}
+                                {/* Modal Thêm Giao Dịch */}
                                 <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                                     <div className="modal-dialog modal-dialog-centered">
                                         <div className="modal-content">
@@ -324,6 +368,102 @@ function Transaction() {
 
                                                     <div className="d-flex gap-2">
                                                         <button type="submit" className="btn btn-primary">Thêm</button>
+                                                        <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                                                            Hủy
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Modal Sửa Giao Dịch */}
+                                <div className={`modal fade ${showModalEdit ? 'show d-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                    <div className="modal-dialog modal-dialog-centered">
+                                        <div className="modal-content">
+                                            <div className="modal-header">
+                                                <h5 className="modal-title">Sửa Giao dịch</h5>
+                                                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                                            </div>
+                                            <div className="modal-body">
+                                                <form onSubmit={handleSubmit}>
+                                                    {loi && (
+                                                        <div className="alert alert-danger" role="alert">
+                                                            {loi}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="ten" className="form-label">Tên giao dịch</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            id="ten"
+                                                            name="ten"
+                                                            value={formDataEdit.ten}
+                                                            onChange={handleChange}
+                                                            placeholder="Ví dụ: Mua thực phẩm"
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="soTien" className="form-label">Số tiền (VNĐ)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            id="soTien"
+                                                            name="soTien"
+                                                            value={formDataEdit.soTien}
+                                                            onChange={handleChange}
+                                                            placeholder="Nhập số tiền"
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="danhMuc" className="form-label">Danh mục</label>
+                                                        <select
+                                                            className="form-select"
+                                                            id="danhMuc"
+                                                            name="danhMuc"
+                                                            value={formDataEdit.danhMuc}
+                                                            onChange={handleChange}
+                                                        >
+                                                            {danhMuc.slice(1).map((dm) => (
+                                                                <option key={dm} value={dm}>
+                                                                    {dm}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="ngay" className="form-label">Ngày giao dịch</label>
+                                                        <input
+                                                            type="date"
+                                                            className="form-control"
+                                                            id="ngay"
+                                                            name="ngay"
+                                                            value={formDataEdit.ngay}
+                                                            onChange={handleChange}
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="moTa" className="form-label">Mô tả (Tùy chọn)</label>
+                                                        <textarea
+                                                            className="form-control"
+                                                            id="moTa"
+                                                            name="moTa"
+                                                            value={formDataEdit.moTa}
+                                                            onChange={handleChange}
+                                                            placeholder="Nhập mô tả giao dịch"
+                                                            rows="4"
+                                                        ></textarea>
+                                                    </div>
+
+                                                    <div className="d-flex gap-2">
+                                                        <button type="submit" className="btn btn-primary">Cập nhật</button>
                                                         <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
                                                             Hủy
                                                         </button>
