@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -8,31 +9,76 @@ class CategorySeeder extends Seeder
 {
     public function run(): void
     {
-        $user1 = \App\Models\User::where('email', 'nguyenvan@example.com')->first();
-        $user2 = \App\Models\User::where('email', 'tranle@example.com')->first();
+        $userId = 1; // Giả định user_id = 1 từ UserSeeder
 
-        Category::create([
-            'user_id' => $user1->id,
-            'name' => 'Lương',
-            'type' => 'income',
-        ]);
+        $categories = [
+            // Danh mục thu nhập
+            [
+                'user_id' => $userId,
+                'type' => 'income',
+                'name' => 'Lương',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'income',
+                'name' => 'Thưởng',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'income',
+                'name' => 'Thu nhập khác',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            // Danh mục chi tiêu
+            [
+                'user_id' => $userId,
+                'type' => 'expense',
+                'name' => 'Ăn uống',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'expense',
+                'name' => 'Mua sắm',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'expense',
+                'name' => 'Bảo hiểm',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'expense',
+                'name' => 'Trọ',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'expense',
+                'name' => 'Di chuyển',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'type' => 'expense',
+                'name' => 'Giải trí',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ];
 
-        Category::create([
-            'user_id' => $user1->id,
-            'name' => 'Ăn uống',
-            'type' => 'expense',
-        ]);
-
-        Category::create([
-            'user_id' => $user2->id,
-            'name' => 'Thưởng',
-            'type' => 'income',
-        ]);
-
-        Category::create([
-            'user_id' => $user2->id,
-            'name' => 'Đi lại',
-            'type' => 'expense',
-        ]);
+        Category::insert($categories);
     }
 }

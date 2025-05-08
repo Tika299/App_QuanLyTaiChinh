@@ -13,8 +13,7 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         try {
-            // Sử dụng user_id mặc định là 1 để thử nghiệm
-            $userId = 1; // Thay đổi nếu cần
+            $userId = 1;
             $locDanhMuc = $request->query('danhMuc', 'Tất cả');
             $locNgay = $request->query('ngay', '');
 
@@ -35,7 +34,9 @@ class TransactionController extends Controller
                     'id' => $transaction->id,
                     'ten' => $transaction->name,
                     'soTien' => $transaction->amount,
-                    'danhMuc' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
+                    'category_id' => $transaction->category->id,
+                    'category_name' => $transaction->category->name,
+                    'danhMelderly' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                     'ngay' => $transaction->created_at->format('Y-m-d'),
                     'moTa' => $transaction->description,
                 ];
@@ -43,7 +44,6 @@ class TransactionController extends Controller
 
             return response()->json($transactions);
         } catch (\Exception $e) {
-            // Ghi log lỗi và trả về thông báo
             Log::error('Lỗi trong index: ' . $e->getMessage());
             return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
         }
@@ -55,7 +55,7 @@ class TransactionController extends Controller
             $validator = Validator::make($request->all(), [
                 'ten' => 'required|string|max:50',
                 'soTien' => 'required|numeric|gt:0',
-                'danhMuc' => 'required|in:Thu nhập,Chi tiêu',
+                'category_id' => 'required|exists:categories,id',
                 'ngay' => 'required|date|before_or_equal:today',
                 'moTa' => 'nullable|string',
             ]);
@@ -64,18 +64,13 @@ class TransactionController extends Controller
                 return response()->json(['error' => $validator->errors()->first()], 422);
             }
 
-            $userId = 1; // User_id mặc định
+            $userId = 1; // Thay bằng auth()->id() trong môi trường thực tế
             $category = Category::where('user_id', $userId)
-                ->where('type', $request->danhMuc === 'Thu nhập' ? 'income' : 'expense')
-                ->first();
-
-            if (!$category) {
-                return response()->json(['error' => 'Danh mục không tồn tại'], 404);
-            }
+                ->findOrFail($request->category_id);
 
             $ten = strtolower($request->ten);
-            if ((str_contains($ten, 'thu') && $request->danhMuc === 'Chi tiêu') ||
-                (str_contains($ten, 'chi') && $request->danhMuc === 'Thu nhập')
+            if ((str_contains($ten, 'thu') && $category->type === 'expense') ||
+                (str_contains($ten, 'chi') && $category->type === 'income')
             ) {
                 return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
             }
@@ -93,6 +88,8 @@ class TransactionController extends Controller
                 'id' => $transaction->id,
                 'ten' => $transaction->name,
                 'soTien' => $transaction->amount,
+                'category_id' => $category->id,
+                'category_name' => $category->name,
                 'danhMuc' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                 'ngay' => $transaction->created_at->format('Y-m-d'),
                 'moTa' => $transaction->description,
@@ -124,14 +121,12 @@ class TransactionController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // Tìm giao dịch theo ID và user_id
             $transaction = Transaction::where('user_id', 1)->findOrFail($id);
 
-            // Xác thực dữ liệu đầu vào
             $validator = Validator::make($request->all(), [
                 'ten' => 'required|string|max:50',
                 'soTien' => 'required|numeric|gt:0',
-                'danhMuc' => 'required|in:Thu nhập,Chi tiêu',
+                'category_id' => 'required|exists:categories,id',
                 'ngay' => 'required|date|before_or_equal:today',
                 'moTa' => 'nullable|string',
             ]);
@@ -140,25 +135,17 @@ class TransactionController extends Controller
                 return response()->json(['error' => $validator->errors()->first()], 422);
             }
 
-            // Kiểm tra danh mục
-            $userId = 1; // User_id mặc định
+            $userId = 1;
             $category = Category::where('user_id', $userId)
-                ->where('type', $request->danhMuc === 'Thu nhập' ? 'income' : 'expense')
-                ->first();
+                ->findOrFail($request->category_id);
 
-            if (!$category) {
-                return response()->json(['error' => 'Danh mục không tồn tại'], 404);
-            }
-
-            // Kiểm tra tính hợp lệ của tên và danh mục
             $ten = strtolower($request->ten);
-            if ((str_contains($ten, 'thu') && $request->danhMuc === 'Chi tiêu') ||
-                (str_contains($ten, 'chi') && $request->danhMuc === 'Thu nhập')
+            if ((str_contains($ten, 'thu') && $category->type === 'expense') ||
+                (str_contains($ten, 'chi') && $category->type === 'income')
             ) {
                 return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
             }
 
-            // Cập nhật giao dịch
             $transaction->update([
                 'category_id' => $category->id,
                 'name' => $request->ten,
@@ -167,19 +154,46 @@ class TransactionController extends Controller
                 'created_at' => $request->ngay,
             ]);
 
-            // Lấy lại giao dịch với thông tin danh mục
             $updatedTransaction = Transaction::where('user_id', 1)->with('category')->findOrFail($id);
 
             return response()->json([
                 'id' => $updatedTransaction->id,
                 'ten' => $updatedTransaction->name,
                 'soTien' => $updatedTransaction->amount,
-                'danhMuc' => $updatedTransaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
+                'category_id' => $category->id,
+                'category_name' => $category->name,
+                'danhMuc' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                 'ngay' => $updatedTransaction->created_at->format('Y-m-d'),
                 'moTa' => $updatedTransaction->description,
             ]);
         } catch (\Exception $e) {
             Log::error('Lỗi trong update: ' . $e->getMessage());
+            return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
+        }
+    }
+    //Thêm API lấy danh mục
+    public function getCategories(Request $request)
+    {
+        try {
+            $userId = 1; // Thay bằng auth()->id() trong môi trường thực tế
+            $type = $request->query('type', 'all'); // 'income', 'expense', hoặc 'all'
+
+            $query = Category::where('user_id', $userId);
+            if ($type !== 'all') {
+                $query->where('type', $type);
+            }
+
+            $categories = $query->get()->map(function ($category) {
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'type' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
+                ];
+            });
+
+            return response()->json($categories);
+        } catch (\Exception $e) {
+            Log::error('Lỗi trong getCategories: ' . $e->getMessage());
             return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
         }
     }

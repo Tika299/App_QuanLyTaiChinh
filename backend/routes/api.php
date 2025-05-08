@@ -72,3 +72,4 @@ Route::post('/transactions', [TransactionController::class, 'store']);
 Route::get('/transactions/{id}', [TransactionController::class, 'show']);
 Route::put('/transactions/{id}', [TransactionController::class, 'update']);
 Route::delete('/transactions/{id}', [TransactionController::class, 'destroy']);
+Route::get('/categories', [TransactionController::class, 'getCategories']);

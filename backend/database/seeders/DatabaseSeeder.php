@@ -17,7 +17,6 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             CategorySeeder::class,
             TransactionSeeder::class,
-            GoalSeeder::class,
         ]);
     }
 }

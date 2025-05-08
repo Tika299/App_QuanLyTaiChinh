@@ -11,18 +11,19 @@ function Transaction() {
     const [locNgay, setLocNgay] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [showModalEdit, setShowModalEdit] = useState(false);
+    const [categories, setCategories] = useState([]);
     const [formDataEdit, setFormDataEdit] = useState({
         id: null,
         ten: '',
         soTien: '',
-        danhMuc: 'Chi tiêu',
+        category_id: '',
         ngay: '',
         moTa: '',
     });
     const [formData, setFormData] = useState({
         ten: '',
         soTien: '',
-        danhMuc: 'Chi tiêu',
+        category_id: '',
         ngay: '',
         moTa: '',
     });
@@ -30,7 +31,18 @@ function Transaction() {
 
     const danhMuc = ['Tất cả', 'Thu nhập', 'Chi tiêu'];
 
-    // Hàm lấy danh sách giao dịch từ API
+    // Lấy danh sách danh mục
+    const fetchCategories = async () => {
+        try {
+            const response = await axios.get('http://localhost:8000/api/categories');
+            setCategories(response.data);
+        } catch (error) {
+            console.error('Lỗi khi lấy danh mục:', error);
+            setLoi('Không thể tải danh sách danh mục');
+        }
+    };
+
+    // Lấy danh sách giao dịch
     const fetchTransactions = async () => {
         try {
             const params = {};
@@ -51,8 +63,9 @@ function Transaction() {
         }
     };
 
-    // Gọi API khi component mount hoặc khi bộ lọc thay đổi
+    // Gọi API khi component mount
     useEffect(() => {
+        fetchCategories();
         fetchTransactions();
     }, [locDanhMuc, locNgay]);
 
@@ -64,16 +77,18 @@ function Transaction() {
     };
 
     const validateForm = (data) => {
-        const { ten, soTien, ngay, danhMuc } = data;
+        const { ten, soTien, ngay, category_id } = data;
         const today = new Date().toISOString().split('T')[0];
+        const category = categories.find(cat => cat.id === parseInt(category_id));
 
         if (!ten) return 'Vui lòng nhập tên giao dịch';
         if (!soTien) return 'Vui lòng nhập số tiền giao dịch';
         if (isNaN(soTien) || soTien <= 0) return 'Số tiền phải là số dương';
+        if (!category_id) return 'Vui lòng chọn danh mục';
         if (!ngay) return 'Vui lòng chọn ngày giao dịch';
         if (ngay > today) return 'Không được chọn ngày giao dịch trong tương lai';
-        if ((ten.toLowerCase().includes('thu') && danhMuc === 'Chi tiêu') ||
-            (ten.toLowerCase().includes('chi') && danhMuc === 'Thu nhập')) {
+        if (category && ((ten.toLowerCase().includes('thu') && category.type === 'Chi tiêu') ||
+            (ten.toLowerCase().includes('chi') && category.type === 'Thu nhập'))) {
             return 'Loại giao dịch không phù hợp với tên';
         }
         return '';
@@ -91,7 +106,6 @@ function Transaction() {
 
         try {
             if (isEditing) {
-                // Update transaction
                 const response = await axios.put(
                     `http://localhost:8000/api/transactions/${formDataEdit.id}`,
                     formDataEdit
@@ -100,17 +114,16 @@ function Transaction() {
                     setGiaoDich(giaoDich.map(gd => (gd.id === formDataEdit.id ? response.data : gd)));
                     alert('Giao dịch đã được cập nhật thành công!');
                     setShowModalEdit(false);
-                    setFormDataEdit({ id: null, ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+                    setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
                 } else {
                     setLoi('Không nhận được dữ liệu từ server');
                 }
             } else {
-                // Add new transaction
                 const response = await axios.post('http://localhost:8000/api/transactions', formData);
                 setGiaoDich([...giaoDich, response.data]);
                 alert('Giao dịch đã được thêm thành công!');
                 setShowModal(false);
-                setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+                setFormData({ ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
             }
             setLoi('');
         } catch (error) {
@@ -121,8 +134,8 @@ function Transaction() {
     const handleCloseModal = () => {
         setShowModal(false);
         setShowModalEdit(false);
-        setFormDataEdit({ id: null, ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
-        setFormData({ ten: '', soTien: '', danhMuc: 'Chi tiêu', ngay: '', moTa: '' });
+        setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
+        setFormData({ ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
         setLoi('');
     };
 
@@ -140,7 +153,7 @@ function Transaction() {
                 id: response.data.id,
                 ten: response.data.ten,
                 soTien: response.data.soTien,
-                danhMuc: response.data.danhMuc,
+                category_id: response.data.category_id,
                 ngay: response.data.ngay,
                 moTa: response.data.moTa
             });
@@ -150,7 +163,7 @@ function Transaction() {
     };
 
     const xuLyXoaGiaoDich = async (id) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa giao dịch này không?')) {
+        if (window.confirm('Bạn có chắc muốn xóa giao dịch này không?')) {
             try {
                 await axios.delete(`http://localhost:8000/api/transactions/${id}`);
                 setGiaoDich(giaoDich.filter((gd) => gd.id !== id));
@@ -241,6 +254,7 @@ function Transaction() {
                                                         <th scope="col">Tên</th>
                                                         <th scope="col">Số tiền</th>
                                                         <th scope="col">Danh mục</th>
+                                                        <th scope="col">Loại</th>
                                                         <th scope="col">Ngày</th>
                                                         <th scope="col">Hành động</th>
                                                     </tr>
@@ -249,9 +263,10 @@ function Transaction() {
                                                     {giaoDich.map((giaoDich) => (
                                                         <tr key={giaoDich.id}>
                                                             <td>{giaoDich.ten}</td>
-                                                            <td className={giaoDich.danhMuc === "Thu nhập" ? 'text-success' : 'text-danger'}>
+                                                            <td className={giaoDich.danhMelderly === "Thu nhập" ? 'text-success' : 'text-danger'}>
                                                                 {Math.abs(giaoDich.soTien).toLocaleString('vi-VN')} VNĐ
                                                             </td>
+                                                            <td>{giaoDich.category_name}</td>
                                                             <td>{giaoDich.danhMuc}</td>
                                                             <td>{giaoDich.ngay}</td>
                                                             <td>
@@ -325,17 +340,18 @@ function Transaction() {
                                                     </div>
 
                                                     <div className="mb-3">
-                                                        <label htmlFor="danhMuc" className="form-label">Danh mục</label>
+                                                        <label htmlFor="category_id" className="form-label">Danh mục</label>
                                                         <select
                                                             className="form-select"
-                                                            id="danhMuc"
-                                                            name="danhMuc"
-                                                            value={formData.danhMuc}
+                                                            id="category_id"
+                                                            name="category_id"
+                                                            value={formData.category_id}
                                                             onChange={handleChange}
                                                         >
-                                                            {danhMuc.slice(1).map((dm) => (
-                                                                <option key={dm} value={dm}>
-                                                                    {dm}
+                                                            <option value="">Chọn danh mục</option>
+                                                            {categories.map((cat) => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.name} ({cat.type})
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -421,17 +437,18 @@ function Transaction() {
                                                     </div>
 
                                                     <div className="mb-3">
-                                                        <label htmlFor="danhMuc" className="form-label">Danh mục</label>
+                                                        <label htmlFor="category_id" className="form-label">Danh mục</label>
                                                         <select
                                                             className="form-select"
-                                                            id="danhMuc"
-                                                            name="danhMuc"
-                                                            value={formDataEdit.danhMuc}
+                                                            id="category_id"
+                                                            name="category_id"
+                                                            value={formDataEdit.category_id}
                                                             onChange={handleChange}
                                                         >
-                                                            {danhMuc.slice(1).map((dm) => (
-                                                                <option key={dm} value={dm}>
-                                                                    {dm}
+                                                            <option value="">Chọn danh mục</option>
+                                                            {categories.map((cat) => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.name} ({cat.type})
                                                                 </option>
                                                             ))}
                                                         </select>
