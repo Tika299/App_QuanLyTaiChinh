@@ -36,6 +36,7 @@ class TransactionController extends Controller
                     'soTien' => $transaction->amount,
                     'category_id' => $transaction->category->id,
                     'category_name' => $transaction->category->name,
+                    'category_color' => $transaction->category->color,
                     'danhMelderly' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                     'ngay' => $transaction->created_at->format('Y-m-d'),
                     'moTa' => $transaction->description,
