@@ -11,6 +11,8 @@ function Transaction() {
     const [locNgay, setLocNgay] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [showModalEdit, setShowModalEdit] = useState(false);
+    const [showModalDetail, setShowModalDetail] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [categories, setCategories] = useState([]);
     const [formDataEdit, setFormDataEdit] = useState({
         id: null,
@@ -56,7 +58,11 @@ function Transaction() {
             const response = await axios.get(`http://localhost/api/transactions`, {
                 params,
             });
-            setGiaoDich(response.data);
+            // Đảm bảo dữ liệu trả về có category_color
+            setGiaoDich(response.data.map(item => ({
+                ...item,
+                category_color: item.category_color || '#000000', // Mặc định đen nếu không có màu
+            })));
         } catch (error) {
             console.error('Lỗi khi lấy giao dịch:', error);
             setLoi(error.response?.data?.error || 'Không thể tải danh sách giao dịch');
@@ -139,6 +145,12 @@ function Transaction() {
         setLoi('');
     };
 
+    const handleCloseModalDetail = () => {
+        setShowModalDetail(false);
+        setSelectedTransaction(null);
+        setLoi('');
+    };
+
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         if (name === 'locDanhMuc') setLocDanhMuc(value);
@@ -176,8 +188,22 @@ function Transaction() {
 
     const xuLyXemChiTiet = async (id) => {
         try {
-            const response = await axios.get(`http://localhost/api/transactions/${id}`);
-            alert(JSON.stringify(response.data, null, 2));
+            // Tìm giao dịch trong danh sách giaoDich
+            const existingTransaction = giaoDich.find((gd) => gd.id === id);
+            if (existingTransaction) {
+                setSelectedTransaction(existingTransaction);
+                setShowModalDetail(true);
+            } else {
+                // Nếu không tìm thấy, gọi API
+                const response = await axios.get(`http://localhost/api/transactions/${id}`);
+                setSelectedTransaction({
+                    ...response.data,
+                    category_name: response.data.category_name || 'Không xác định',
+                    category_color: response.data.category_color || '#000000',
+                    danhMelderly: response.data.danhMelderly || 'Không xác định',
+                });
+                setShowModalDetail(true);
+            }
         } catch (error) {
             setLoi(error.response?.data?.error || 'Lỗi khi xem chi tiết giao dịch');
         }
@@ -266,8 +292,19 @@ function Transaction() {
                                                             <td className={giaoDich.danhMelderly === "Thu nhập" ? 'text-success' : 'text-danger'}>
                                                                 {Math.abs(giaoDich.soTien).toLocaleString('vi-VN')} VNĐ
                                                             </td>
-                                                            <td>{giaoDich.category_name}</td>
-                                                            <td>{giaoDich.danhMuc}</td>
+                                                            <td>
+                                                                <span
+                                                                    style={{
+                                                                        backgroundColor: giaoDich.category_color,
+                                                                        color: '#fff',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                    }}
+                                                                >
+                                                                    {giaoDich.category_name}
+                                                                </span>
+                                                            </td>
+                                                            <td>{giaoDich.danhMelderly}</td>
                                                             <td>{giaoDich.ngay}</td>
                                                             <td>
                                                                 <button
@@ -486,6 +523,75 @@ function Transaction() {
                                                         </button>
                                                     </div>
                                                 </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Modal Xem Chi Tiết Giao Dịch */}
+                                <div className={`modal fade ${showModalDetail ? 'show d-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                    <div className="modal-dialog modal-dialog-centered">
+                                        <div className="modal-content">
+                                            <div className="modal-header">
+                                                <h5 className="modal-title">Chi Tiết Giao Dịch</h5>
+                                                <button type="button" className="btn-close" onClick={handleCloseModalDetail}></button>
+                                            </div>
+                                            <div className="modal-body">
+                                                {loi && (
+                                                    <div className="alert alert-danger" role="alert">
+                                                        {loi}
+                                                    </div>
+                                                )}
+                                                {selectedTransaction && (
+                                                    <div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Tên giao dịch</label>
+                                                            <p>{selectedTransaction.ten}</p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Số tiền (VNĐ)</label>
+                                                            <p className={selectedTransaction.danhMelderly === "Thu nhập" ? 'text-success' : 'text-danger'}>
+                                                                {Math.abs(selectedTransaction.soTien).toLocaleString('vi-VN')} VNĐ
+                                                            </p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Danh mục</label>
+                                                            <p>
+                                                                <span
+                                                                    style={{
+                                                                        backgroundColor: selectedTransaction.category_color,
+                                                                        color: '#fff',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                    }}
+                                                                >
+                                                                    {selectedTransaction.category_name}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Loại</label>
+                                                            <p>{selectedTransaction.danhMelderly}</p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Ngày giao dịch</label>
+                                                            <p>{selectedTransaction.ngay}</p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Mô tả</label>
+                                                            <p>{selectedTransaction.moTa || 'Không có mô tả'}</p>
+                                                        </div>
+                                                        <div className="d-flex justify-content-end">
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary"
+                                                                onClick={handleCloseModalDetail}
+                                                            >
+                                                                Đóng
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
