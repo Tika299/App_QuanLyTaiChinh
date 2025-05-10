@@ -34,7 +34,7 @@ function Transaction() {
     // Lấy danh sách danh mục
     const fetchCategories = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/categories');
+            const response = await axios.get(`http://localhost/api/categories`);
             setCategories(response.data);
         } catch (error) {
             console.error('Lỗi khi lấy danh mục:', error);
@@ -53,7 +53,7 @@ function Transaction() {
                 params.ngay = locNgay;
             }
 
-            const response = await axios.get('http://localhost:8000/api/transactions', {
+            const response = await axios.get(`http://localhost/api/transactions`, {
                 params,
             });
             setGiaoDich(response.data);
@@ -107,7 +107,7 @@ function Transaction() {
         try {
             if (isEditing) {
                 const response = await axios.put(
-                    `http://localhost:8000/api/transactions/${formDataEdit.id}`,
+                    `http://localhost/api/transactions/${formDataEdit.id}`,
                     formDataEdit
                 );
                 if (response.data) {
@@ -119,7 +119,7 @@ function Transaction() {
                     setLoi('Không nhận được dữ liệu từ server');
                 }
             } else {
-                const response = await axios.post('http://localhost:8000/api/transactions', formData);
+                const response = await axios.post(`http://localhost/api/transactions`, formData);
                 setGiaoDich([...giaoDich, response.data]);
                 alert('Giao dịch đã được thêm thành công!');
                 setShowModal(false);
@@ -148,7 +148,7 @@ function Transaction() {
     const xuLySuaGiaoDich = async (id) => {
         setShowModalEdit(true);
         try {
-            const response = await axios.get(`http://localhost:8000/api/transactions/${id}`);
+            const response = await axios.get(`http://localhost/api/transactions/${id}`);
             setFormDataEdit({
                 id: response.data.id,
                 ten: response.data.ten,
@@ -165,7 +165,7 @@ function Transaction() {
     const xuLyXoaGiaoDich = async (id) => {
         if (window.confirm('Bạn có chắc muốn xóa giao dịch này không?')) {
             try {
-                await axios.delete(`http://localhost:8000/api/transactions/${id}`);
+                await axios.delete(`http://localhost/api/transactions/${id}`);
                 setGiaoDich(giaoDich.filter((gd) => gd.id !== id));
                 alert('Giao dịch đã được xóa thành công!');
             } catch (error) {
@@ -176,7 +176,7 @@ function Transaction() {
 
     const xuLyXemChiTiet = async (id) => {
         try {
-            const response = await axios.get(`http://localhost:8000/api/transactions/${id}`);
+            const response = await axios.get(`http://localhost/api/transactions/${id}`);
             alert(JSON.stringify(response.data, null, 2));
         } catch (error) {
             setLoi(error.response?.data?.error || 'Lỗi khi xem chi tiết giao dịch');
