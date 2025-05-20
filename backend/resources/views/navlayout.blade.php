@@ -1,27 +1,31 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Ứng Dụng</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
-
-    <!-- Navbar nếu cần -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
-            <a class="navbar-brand" href="#">Mục Tiêu Tài Chính</a>
+            <a class="navbar-brand" href="{{ route('home') }}">Ứng Dụng</a>
+            <div class="navbar-nav">
+                @auth
+                    <a class="nav-link" href="{{ route('profile.show') }}">Hồ Sơ</a>
+                    <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="nav-link btn btn-link">Đăng Xuất</button>
+                    </form>
+                @else
+                    <a class="nav-link" href="{{ route('login') }}">Đăng Nhập</a>
+                    <a class="nav-link" href="{{ route('register') }}">Đăng Ký</a>
+                @endauth
+            </div>
         </div>
     </nav>
-
-    <!-- Nội dung -->
-    <main class="py-4">
+    <div class="container">
         @yield('content')
-    </main>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    </div>
 </body>
 </html>

@@ -1,109 +1,82 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\Goal;
 use App\Models\Category;
 use Illuminate\Http\Request;
 
 class GoalController extends Controller
 {
-    // Hiển thị tất cả mục tiêu và danh mục
-    public function index()
+    public function index(Request $request)
     {
-        // Lấy tất cả các mục tiêu và danh mục
-        $goals = Goal::all();
-        $categories = Category::all();
-
-        // Trả về view 'exe.manage' với dữ liệu goals và categories
-        return view('exe.manage', compact('goals', 'categories'));
+        $goals = Goal::with('category')->paginate(10);
+        return response()->json($goals);
     }
 
-
-    // Hiển thị form thêm mục tiêu
-    public function create()
-    {
-        $categories = Category::all();
-        return view('goals.create', compact('categories'));
-    }
-    public function createGoal()
-{
-    // Kiểm tra xem danh mục đã tồn tại chưa, nếu chưa thì thêm
-    $category = Category::firstOrCreate([
-        'name' => 'Tiết Kiệm',
-    ]);
-
-    // Tạo mục tiêu và gắn danh mục vào mục tiêu
-    Goal::create([
-        'name' => 'Mục tiêu tiết kiệm',
-        'type' => 'income',
-        'category_id' => $category->id,
-        'target_amount' => 10000,
-        'due_date' => '2025-12-31',
-        'note' => 'Lập kế hoạch tiết kiệm',
-    ]);
-
-    // Redirect sang trang danh sách mục tiêu
-    return redirect()->route('goals.index')->with('success', 'Mục tiêu đã được tạo thành công!');
-}
-
-    // Lưu mục tiêu mới
     public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string',
-            'type' => 'required|in:income,expense',
-            'category_id' => 'nullable|exists:categories,id',
-            'target_amount' => 'required|numeric',
+{
+    try {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'category_id' => 'required|exists:categories,id',
+            'target_amount' => 'required|numeric|min:0',
             'due_date' => 'required|date',
             'note' => 'nullable|string',
         ]);
 
-        Goal::create([
-            'name' => $request->input('name'),
-            'type' => $request->input('type'),
-            'category_id' => $request->input('category_id'),
-            'target_amount' => $request->input('target_amount'),
-            'due_date' => $request->input('due_date'),
-            'note' => $request->input('note'),
-        ]);
-
-        return redirect()->route('goals.index')->with('success', 'Đã thêm mục tiêu!');
+        $goal = Goal::create($validated);
+        return response()->json(['message' => 'Đã thêm mục tiêu!', 'goal' => $goal], 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        \Log::error('Validation error: ' . json_encode($e->errors()));
+        return response()->json(['errors' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        \Log::error('Store error: ' . $e->getMessage());
+        return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
     }
+}
 
-    // Cập nhật mục tiêu
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:income,expense',
-            'category_id' => 'required|exists:categories,id',
-            'target_amount' => 'required|numeric|min:0',
-            'due_date' => 'required|date|after:today',
-            'note' => 'nullable|string',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'category_id' => 'required|exists:categories,id',
+                'target_amount' => 'required|numeric|min:0',
+                'due_date' => 'required|date',
+                'note' => 'nullable|string',
+            ]);
 
-        // Lấy mục tiêu cần sửa từ ID
-        $goal = Goal::findOrFail($id);
-        $goal->update([
-            'name' => $request->name,
-            'type' => $request->type,
-            'category_id' => $request->category_id,
-            'target_amount' => $request->target_amount,
-            'due_date' => $request->due_date,
-            'note' => $request->note,
-        ]);
-
-        return redirect()->route('goals.index')->with('success', 'Mục tiêu đã được cập nhật!');
+            $goal = Goal::findOrFail($id);
+            $goal->update($validated);
+            return response()->json(['message' => 'Mục tiêu đã được cập nhật!', 'goal' => $goal]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation error: ' . json_encode($e->errors()));
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Update error: ' . $e->getMessage());
+            return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
+        }
     }
 
-
-    // Xóa mục tiêu
     public function destroy($id)
     {
-        $goal = Goal::findOrFail($id);
-        $goal->delete();
+        try {
+            $goal = Goal::findOrFail($id);
+            $goal->delete();
+            return response()->json(['message' => 'Mục tiêu đã được xóa!']);
+        } catch (\Exception $e) {
+            \Log::error('Destroy error: ' . $e->getMessage());
+            return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
+        }
+    }
 
-        return redirect()->route('goals.index')->with('success', 'Mục tiêu đã được xóa!');
+    public function deleteAll(Request $request)
+    {
+        try {
+            Goal::truncate();
+            return response()->json(['message' => 'Đã xóa tất cả mục tiêu!']);
+        } catch (\Exception $e) {
+            \Log::error('Delete all error: ' . $e->getMessage());
+            return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
+        }
     }
 }

@@ -1,28 +1,52 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
-
 class CrudUserController extends Controller
 {
+    public function showLoginForm()
+    {
+        return view('auth.login');
+    }
 
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
 
+        if (Auth::attempt($request->only('email', 'password'))) {
+            return response()->json(['message' => 'Đăng nhập thành công!'], 200);
+        }
 
-    //React
+        throw ValidationException::withMessages([
+            'email' => ['Email hoặc mật khẩu không đúng.'],
+        ]);
+    }
 
-    // Đăng ký người dùng
+    public function showRegisterForm()
+    {
+        return view('auth.register');
+    }
+
+    public function logout(Request $request)
+    {
+        Auth::logout();
+        return response()->json(['message' => 'Đăng xuất thành công!'], 200);
+    }
+
     public function signup(Request $request)
     {
         $request->validate([
             'username' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6|confirmed',
         ]);
 
@@ -34,118 +58,81 @@ class CrudUserController extends Controller
             'avatar' => 'default.png',
         ]);
 
-        return response()->json([
-            'message' => 'Đăng ký thành công!',
-            'user' => $user,
-        ], 201);
-    }
-
-    // Đăng nhập
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Email hoặc mật khẩu không đúng.'],
-            ]);
-        }
-
         Auth::login($user);
-
-        return response()->json([
-            'message' => 'Đăng nhập thành công!',
-            'user' => $user,
-        ]);
+        return response()->json(['message' => 'Đăng ký thành công!'], 201);
     }
 
-    // Đăng xuất
-    public function logout(Request $request)
-    {
-        Auth::logout();
+    public function show(Request $request)
+{
+    $user = \App\Models\User::first(); // Lấy user đầu tiên
+    return response()->json($user ?: ['error' => 'Không có user']);
+}
 
-        return response()->json([
-            'message' => 'Đăng xuất thành công!'
-        ]);}
-
-    public function edit()
-    {
-        $user = User::find(1);
-        return view('exe.edit', compact('user'));
-    }
-
-    // Cập nhật thông tin người dùng
     public function update(Request $request)
     {
-        $user = User::find(1);
-
+        $user = Auth::user();
         if (!$user) {
-            return redirect()->back()->withErrors(['user' => 'Người dùng không tồn tại']);
+            return response()->json(['error' => 'Vui lòng đăng nhập.'], 401);
         }
 
-        $request->validate([
-            'username' => 'required|string|max:255',
+        try {
+            $request->validate([
+                'username' => 'required|string|max:255',
+                'email' => [
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('users', 'email')->ignore($user->id),
+                ],
+                'phone' => [
+                    'nullable',
+                    'regex:/^0\d{9}$/',
+                ],
+                'city' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                    'regex:/^[a-zA-Z\sÀ-ỹ]+$/u',
+                ],
+                'bio' => 'nullable|string|max:1000',
+                'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ], [
+                'username.required' => 'Tên người dùng không được để trống.',
+                'email.required' => 'Email không được để trống.',
+                'email.email' => 'Email không đúng định dạng.',
+                'email.unique' => 'Email đã tồn tại, hãy nhập email khác.',
+                'phone.regex' => 'Số điện thoại phải là 10 chữ số và bắt đầu bằng 0.',
+                'city.regex' => 'Thành phố chỉ được chứa chữ cái, khoảng trắng và dấu tiếng Việt.',
+                'city.max' => 'Thành phố không được vượt quá 255 ký tự.',
+                'bio.max' => 'Giới thiệu không được vượt quá 1000 ký tự.',
+                'avatar.image' => 'Ảnh đại diện phải là hình ảnh.',
+                'avatar.mimes' => 'Ảnh đại diện phải có định dạng jpeg, png, jpg, hoặc gif.',
+                'avatar.max' => 'Ảnh đại diện không được vượt quá 2MB.',
+            ]);
 
-            'email' => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('users', 'email')->ignore($user->id), // Đảm bảo $user tồn tại
-            ],
+            $data = [
+                'username' => $request->username,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'city' => $request->city,
+                'bio' => $request->bio,
+            ];
 
-            'phone' => [
-                'required',
-                'regex:/^\d{10}$/',
-            ],
+            if ($request->hasFile('avatar')) {
+                if ($user->avatar && $user->avatar !== 'default.png' && Storage::exists('public/' . $user->avatar)) {
+                    Storage::delete('public/' . $user->avatar);
+                }
+                $data['avatar'] = $request->file('avatar')->store('avatars', 'public');
+            }
 
-            'city' => [
-                'nullable',
-                'string',
-                'regex:/^[a-zA-Z\s]+$/',
-            ],
-
-            'bio' => 'nullable|string',
-
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ], [
-            'username.required' => 'Ô này không được để trống',
-            'email.required' => 'Ô này không được để trống',
-            'email.email' => 'Email không đúng định dạng',
-            'email.unique' => 'Email đã tồn tại hãy nhập email khác',
-            'phone.required' => 'Ô này không được để trống',
-            'phone.regex' => 'Số điện thoại phải chứa tối đa 10 chữ số và chỉ được chứa ký tự số',
-            'city.regex' => 'Trường nhập thành phố không được chứa các ký tự đặc biệt :@#$%^?',
-            'avatar.image' => 'Ảnh đại diện phải là hình ảnh',
-            'avatar.mimes' => 'Ảnh đại diện phải có định dạng jpeg, png, jpg, hoặc gif',
-            'avatar.max' => 'Ảnh đại diện không được vượt quá 2MB',
-        ]);
-
-        // Cập nhật dữ liệu
-        $user->update([
-            'name' => $request->username,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'city' => $request->city,
-            'bio' => $request->bio,
-        ]);
-
-        if ($request->hasFile('avatar')) {
-            $avatarPath = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = $avatarPath;
-            $user->save();
+            $user->update($data);
+            return response()->json(['message' => 'Hồ sơ đã được cập nhật!', 'user' => $user], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation error: ' . json_encode($e->errors()));
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Update user error: ' . $e->getMessage());
+            return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
-
-        return redirect()->route('profile.show')->with('success', 'Cập nhật thành công!');
     }
-    public function show()
-    {
-        $user = User::find(1); // hoặc Auth::user() nếu dùng auth
-        return view('exe.user', compact('user'));
-    }
-
 }

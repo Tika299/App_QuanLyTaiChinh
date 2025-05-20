@@ -5,29 +5,26 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('username')->unique(); // thêm username
-            $table->string('email')->unique();    // email đã có sẵn
-            $table->timestamp('email_verified_at')->nullable(); // có thể giữ hoặc xóa nếu không dùng
+            $table->string('username');
+            $table->string('email')->unique();
             $table->string('password');
-            $table->enum('role', ['user', 'admin'])->default('user'); // thêm role
-            $table->string('avatar')->default('default.png'); // thêm avatar
-            $table->rememberToken(); // dùng cho tính năng "remember me"
-            $table->timestamps(); // created_at + updated_at
+            $table->string('role')->default('user');
+            $table->string('avatar')->default('default.png');
+            $table->string('phone')->nullable();
+            $table->string('city')->nullable();
+            $table->text('bio')->nullable();
+            $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('users');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn(['username', 'role', 'avatar', 'phone', 'city', 'bio']);
+        });
     }
 };
