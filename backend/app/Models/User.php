@@ -8,8 +8,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Notifications\ResetPasswordNotification;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-
 
 class User extends Authenticatable
 {
@@ -26,7 +24,8 @@ class User extends Authenticatable
         'password',
         'image',
         'balance',
-        'avatar',  
+        'avatar',
+        'role',
     ];
 
     /**
@@ -51,12 +50,6 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token)
     {
         $this->notify(new ResetPasswordNotification($token, $this->email));
-    }
-
-    
-    public function roles(): BelongsToMany
-    {
-        return $this->belongsToMany(Role::class, 'user_role');
     }
 
 }

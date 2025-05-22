@@ -4,80 +4,93 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Transaction;
 use App\Models\Category;
-use App\Models\User;
-use Carbon\Carbon;
 
 class TransactionSeeder extends Seeder
 {
     public function run(): void
     {
-        Transaction::truncate(); // Xóa dữ liệu cũ
+        $userId = 1; // Giả định user_id = 1 từ UserSeeder
 
-        $users = User::all(); // Lấy 10 người dùng
-        $monthlyData = [
-            1 => [
-                ['Lương', 6000000, 'Lương tháng 1'],
-                ['Ăn uống', 200000, 'Ăn trưa'],
-                ['Trọ', 2000000, 'Tiền thuê nhà'],
-                ['Di chuyển', 100000, 'Xăng xe'],
-                ['Giải trí', 180000, 'Vé xem phim'],
+        // Lấy danh mục để liên kết
+        $categories = Category::where('user_id', $userId)->get()->keyBy('name');
+
+        $transactions = [
+            // Giao dịch thu nhập
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Lương']->id,
+                'name' => 'Lương tháng 5',
+                'amount' => 15000000,
+                'description' => 'Lương tháng 5/2025',
+                'created_at' => '2025-05-01 08:00:00',
+                'updated_at' => now(),
             ],
-            2 => [
-                ['Lương', 6200000, 'Lương tháng 2'],
-                ['Mua sắm', 400000, 'Mua quần áo'],
-                ['Ăn uống', 300000, 'Tiệc bạn bè'],
-                ['Bảo hiểm', 300000, 'Bảo hiểm y tế'],
-                ['Di chuyển', 150000, 'Gửi xe'],
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Thưởng']->id,
+                'name' => 'Thưởng dự án',
+                'amount' => 5000000,
+                'description' => 'Thưởng hoàn thành dự án sớm',
+                'created_at' => '2025-05-03 09:00:00',
+                'updated_at' => now(),
             ],
-            3 => [
-                ['Thưởng', 1000000, 'Thưởng quý 1'],
-                ['Ăn uống', 250000, 'Ăn buffet'],
-                ['Trọ', 2000000, 'Tiền thuê nhà'],
-                ['Giải trí', 200000, 'Mua sách'],
-                ['Di chuyển', 180000, 'Xăng xe'],
+            // Giao dịch chi tiêu
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Ăn uống']->id,
+                'name' => 'Mua thực phẩm',
+                'amount' => 500000,
+                'description' => 'Mua đồ ăn cho tuần',
+                'created_at' => '2025-05-02 12:00:00',
+                'updated_at' => now(),
             ],
-            4 => [
-                ['Lương', 6300000, 'Lương tháng 4'],
-                ['Mua sắm', 500000, 'Quần áo hè'],
-                ['Ăn uống', 300000, 'Ăn tối'],
-                ['Bảo hiểm', 300000, 'Bảo hiểm xe'],
-                ['Di chuyển', 150000, 'Gửi xe'],
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Mua sắm']->id,
+                'name' => 'Mua quần áo',
+                'amount' => 1200000,
+                'description' => 'Mua quần áo mùa hè',
+                'created_at' => '2025-05-04 15:00:00',
+                'updated_at' => now(),
             ],
-            5 => [
-                ['Lương', 6500000, 'Lương tháng 5'],
-                ['Giải trí', 300000, 'Vé hòa nhạc'],
-                ['Trọ', 2000000, 'Tiền thuê nhà'],
-                ['Mua sắm', 450000, 'Mua giày'],
-                ['Ăn uống', 280000, 'Cafe bạn bè'],
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Bảo hiểm']->id,
+                'name' => 'Phí bảo hiểm y tế',
+                'amount' => 800000,
+                'description' => 'Thanh toán bảo hiểm y tế hàng năm',
+                'created_at' => '2025-05-05 10:00:00',
+                'updated_at' => now(),
             ],
-            6 => [
-                ['Thu nhập khác', 800000, 'Thu nhập phụ'],
-                ['Ăn uống', 260000, 'Ăn trưa nhà hàng'],
-                ['Di chuyển', 220000, 'Sửa xe'],
-                ['Giải trí', 320000, 'Netflix 3 tháng'],
-                ['Bảo hiểm', 300000, 'Bảo hiểm sức khỏe'],
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Trọ']->id,
+                'name' => 'Tiền thuê nhà',
+                'amount' => 4000000,
+                'description' => 'Tiền thuê nhà tháng 5',
+                'created_at' => '2025-05-01 09:00:00',
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Di chuyển']->id,
+                'name' => 'Đổ xăng xe',
+                'amount' => 200000,
+                'description' => 'Đổ xăng cho xe máy',
+                'created_at' => '2025-05-06 08:00:00',
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $userId,
+                'category_id' => $categories['Giải trí']->id,
+                'name' => 'Xem phim',
+                'amount' => 150000,
+                'description' => 'Vé xem phim cuối tuần',
+                'created_at' => '2025-05-07 18:00:00',
+                'updated_at' => now(),
             ],
         ];
 
-        foreach ($users as $user) {
-            $categories = Category::where('user_id', $user->id)->get()->keyBy('name');
-            $transactions = [];
-
-            foreach ($monthlyData as $month => $items) {
-                foreach ($items as $index => [$catName, $amount, $description]) {
-                    $transactions[] = [
-                        'user_id' => $user->id,
-                        'category_id' => $categories[$catName]->id,
-                        'name' => $catName,
-                        'amount' => $amount,
-                        'description' => $description,
-                        'created_at' => Carbon::create(2025, $month, 1 + $index * 5, 10, 0, 0),
-                        'updated_at' => now(),
-                    ];
-                }
-            }
-
-            Transaction::insert($transactions);
-        }
+        Transaction::insert($transactions);
     }
 }
