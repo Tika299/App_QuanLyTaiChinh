@@ -1,27 +1,37 @@
 <?php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
-use App\Models\Role;
 
 class UserRoleSeeder extends Seeder
 {
+    const MAX_RECORDS = 10; // 1 admin + 9 user
+
     public function run(): void
     {
-        $users = User::all();
-        $roles = Role::all();
+        // Xóa bảng user_role trước khi gán lại
+        DB::table('user_role')->truncate();
 
-        foreach ($users as $user) {
-            // Gán ngẫu nhiên 1 role cho mỗi user
-            $role = $roles->random();
-            DB::table('user_role')->insert([
-                'user_id' => $user->id,
-                'role_id' => $role->id,
+        // Gán role admin cho user_id = 1
+        DB::table('user_role')->insert([
+            [
+                'user_id' => 1,
+                'role_id' => 1, // Admin
                 'created_at' => now(),
                 'updated_at' => now(),
+            ]
+        ]);
+
+        // Gán role member cho user từ id 2 đến 10
+        for ($i = 2; $i <= self::MAX_RECORDS; $i++) {
+            DB::table('user_role')->insert([
+                [
+                    'user_id' => $i,
+                    'role_id' => 2, // Member
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
             ]);
         }
     }

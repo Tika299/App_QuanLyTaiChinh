@@ -3,35 +3,40 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
-use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class UserSeeder extends Seeder
 {
+    const MAX_RECORDS = 10; // 1 admin + 9 user
+
     public function run(): void
     {
-        $user1 = User::create([
-            'username' => 'nguyenvan',
-            'email' => 'nguyenvan@example.com',
-            'password' => Hash::make('matkhau123'),
-            'avatar' => 'default.jpg',
-            'balance' => 1000000.00,
+        // Xóa toàn bộ dữ liệu bảng users
+        User::truncate();
+
+        // Tạo tài khoản admin
+        User::create([
+            'username' => 'admin',
+            'email' => 'admin@gmail.com',
+            'email_verified_at' => now(),
+            'password' => Hash::make('123456'),
+            'remember_token' => Str::random(10),
+            'avatar' => 'default.png',
+            'balance' => 1000000,
         ]);
 
-        $user2 = User::create([
-            'username' => 'tranle',
-            'email' => 'tranle@example.com',
-            'password' => Hash::make('matkhau123'),
-            'avatar' => 'default.jpg',
-            'balance' => 500000.00,
-        ]);
-
-        // Lấy role theo tên, ví dụ "member"
-        $memberRole = Role::where('name', 'member')->first();
-
-        if ($memberRole) {
-            $user1->roles()->attach($memberRole->id);
-            $user2->roles()->attach($memberRole->id);
+        // Tạo 9 user ngẫu nhiên
+        for ($i = 2; $i <= self::MAX_RECORDS; $i++) {
+            User::create([
+                'username' => 'user' . $i,
+                'email' => "user{$i}@gmail.com",
+                'email_verified_at' => now(),
+                'password' => Hash::make('123456'),
+                'remember_token' => Str::random(10),
+                'avatar' => 'default.png',
+                'balance' => rand(100000, 1000000), // Random số dư
+            ]);
         }
     }
 }

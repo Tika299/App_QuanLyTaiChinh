@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -15,16 +14,14 @@ class FinanceController extends Controller
     {
         $type = $request->query('type', 'month');
         $user = $request->user();
-        $currentYear = Carbon::now()->year; // 2025
 
         // Xác định định dạng thời gian
-        if ($type === 'year') {
-            $dateFormat = '%Y';
-        } elseif ($type === 'week') {
-            $dateFormat = '%x-W%v'; // ISO week: "2025-W18"
-        } else {
-            $dateFormat = '%m/%Y'; // "05/2025"
-        }
+        $dateFormat = match ($type) {
+            'year' => '%Y',
+            'week' => '%Y-W%V', // ISO week format: "2025-W01"
+            'month' => '%m/%Y', // "01/2025"
+            default => '%m/%Y',
+        };
 
         // Lấy thu nhập và chi tiêu theo thời gian
         $query = Transaction::select(
@@ -35,11 +32,6 @@ class FinanceController extends Controller
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
             ->where('categories.user_id', $user->id);
-
-        // Chỉ giới hạn năm hiện tại cho week và month
-        if ($type === 'week' || $type === 'month') {
-            $query->whereYear('transactions.created_at', $currentYear);
-        }
 
         $transactions = $query
             ->groupBy('period')
@@ -60,14 +52,10 @@ class FinanceController extends Controller
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
             ->where('categories.user_id', $user->id)
-            ->where('categories.type', 'expense');
-
-        if ($type === 'week' || $type === 'month') {
-            $categoriesQuery->whereYear('transactions.created_at', $currentYear);
-        }
+            ->where('categories.type', 'expense')
+            ->groupBy('categories.id', 'categories.name', 'categories.color');
 
         $categories = $categoriesQuery
-            ->groupBy('categories.id', 'categories.name', 'categories.color')
             ->get()
             ->map(fn($cat) => [
                 'name' => $cat->name,
@@ -87,14 +75,11 @@ class FinanceController extends Controller
         )
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
-            ->where('categories.user_id', $user->id);
-
-        if ($type === 'week' || $type === 'month') {
-            $transactionsHistoryQuery->whereYear('transactions.created_at', $currentYear);
-        }
+            ->where('categories.user_id', $user->id)
+            ->orderBy('transactions.created_at', 'desc')
+            ->take(50); // Giới hạn 50 giao dịch để tránh lag
 
         $transactionsHistory = $transactionsHistoryQuery
-            ->orderBy('transactions.created_at', 'desc')
             ->get()
             ->map(fn($t) => [
                 'date' => $t->date,
@@ -120,7 +105,6 @@ class FinanceController extends Controller
         $period1 = $request->query('period1');
         $period2 = $request->query('period2');
         $user = $request->user();
-        $currentYear = Carbon::now()->year; // 2025
 
         if (!$period1 || !$period2) {
             return response()->json(['message' => 'Vui lòng chọn cả hai khoảng thời gian'], 422);
@@ -140,8 +124,7 @@ class FinanceController extends Controller
         foreach ($periods as $key => $period) {
             $query = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('transactions.user_id', $user->id)
-                ->where('categories.user_id', $user->id)
-                ->whereYear('transactions.created_at', $currentYear);
+                ->where('categories.user_id', $user->id);
 
             if ($type === 'month') {
                 if (!preg_match('/^\d{4}-\d{2}$/', $period)) {
@@ -160,11 +143,16 @@ class FinanceController extends Controller
                 }
                 [$year, $weekStr] = explode('-W', $period);
                 $week = (int) $weekStr;
-                // Bỏ kiểm tra $week > 6 để cho phép tuần 22, 24
                 $query->whereYear('transactions.created_at', $year)
-                      ->whereRaw('WEEK(transactions.created_at, 1) = ?', [$week]);
+                      ->whereRaw('WEEK(transactions.created_at, 1) = ?', [$week - 1]); // WEEK bắt đầu từ 0
 
                 $label = "Tuần $week ($year)";
+            } elseif ($type === 'year') {
+                if (!preg_match('/^\d{4}$/', $period)) {
+                    return response()->json(['message' => 'Định dạng năm không hợp lệ. Kỳ vọng: YYYY'], 422);
+                }
+                $query->whereYear('transactions.created_at', $period);
+                $label = "Năm $period";
             } else {
                 return response()->json(['message' => 'Loại thống kê không hợp lệ'], 422);
             }

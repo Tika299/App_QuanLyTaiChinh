@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -74,13 +74,13 @@ const Dashboard = () => {
   });
   const [toasts, setToasts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-
-  // State cho periodOptions
   const [periodOptions, setPeriodOptions] = useState({
     month: [],
     week: [],
   });
+  const [selectedYear, setSelectedYear] = useState(null);
+  const chartRef = useRef(null);
+  const itemsPerPage = 5;
 
   // Hàm thêm toast
   const addToast = (message, type = 'danger') => {
@@ -97,7 +97,7 @@ const Dashboard = () => {
   };
 
   // Hàm lấy dữ liệu từ API
-  const fetchFinanceData = async (frame) => {
+  const fetchFinanceData = async (frame, year = null) => {
     try {
       await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
         withCredentials: true,
@@ -110,24 +110,27 @@ const Dashboard = () => {
         return;
       }
 
-      const response = await axios.get(`http://127.0.0.1:8000/api/finance?type=${frame}`, {
+      const url = year
+        ? `http://127.0.0.1:8000/api/finance?type=${frame}&year=${year}`
+        : `http://127.0.0.1:8000/api/finance?type=${frame}`;
+
+      const response = await axios.get(url, {
         withCredentials: true,
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Lọc dữ liệu chỉ lấy năm 2024 và 2025
-      const allowedYears = ['2024', '2025'];
       let filteredData = response.data;
-      if (frame === 'week' || frame === 'month') {
+      if (frame === 'year' && !year) {
+        const allowedYears = ['2024', '2025'];
         filteredData = {
           labels: response.data.labels.filter((label) =>
-            allowedYears.some((year) => label.includes(year))
+            allowedYears.includes(label)
           ),
           income: response.data.income.slice(0, response.data.labels.length).filter((_, i) =>
-            allowedYears.some((year) => response.data.labels[i].includes(year))
+            allowedYears.includes(response.data.labels[i])
           ),
           expenses: response.data.expenses.slice(0, response.data.labels.length).filter((_, i) =>
-            allowedYears.some((year) => response.data.labels[i].includes(year))
+            allowedYears.includes(response.data.labels[i])
           ),
           categories: response.data.categories,
           transactions: response.data.transactions.filter((t) =>
@@ -136,13 +139,42 @@ const Dashboard = () => {
         };
       }
 
-      setFinanceData(filteredData);
-      setCurrentPage(1);
+      // Xử lý dữ liệu tuần, chỉ lấy các tuần có dữ liệu (tối đa 25 tuần)
+      if (frame === 'week') {
+        const weeks = [...new Set(response.data.labels)]
+          .filter((label) => {
+            if (year && !label.includes(year)) return false;
+            const [, weekNum] = label.split('-W');
+            const weekNumber = parseInt(weekNum, 10);
+            return weekNumber <= 25; // Chỉ lấy đến tuần 25
+          })
+          .map((label) => {
+            const [, weekNum] = label.split('-W');
+            const weekNumber = parseInt(weekNum, 10);
+            return {
+              value: label,
+              label: `Tuần ${weekNumber} (${label.split('-W')[0]})`,
+              weekNum: weekNumber,
+              year: label.split('-W')[0],
+            };
+          })
+          .sort((a, b) => {
+            // Sắp xếp theo năm trước, sau đó theo tuần
+            if (a.year !== b.year) return a.year.localeCompare(b.year);
+            return a.weekNum - b.weekNum;
+          });
 
-      // Cập nhật periodOptions động
-      if (frame === 'month') {
+        filteredData = {
+          ...response.data,
+          labels: weeks.map((w) => w.label),
+          income: weeks.map((w) => response.data.income[response.data.labels.indexOf(w.value)] || 0),
+          expenses: weeks.map((w) => response.data.expenses[response.data.labels.indexOf(w.value)] || 0),
+        };
+
+        setPeriodOptions((prev) => ({ ...prev, week: weeks }));
+      } else if (frame === 'month') {
         const months = [...new Set(response.data.labels)]
-          .filter((label) => allowedYears.some((year) => label.includes(year)))
+          .filter((label) => (year ? label.includes(year) : true))
           .map((label) => {
             const [month, year] = label.split('/');
             return {
@@ -152,38 +184,48 @@ const Dashboard = () => {
           })
           .sort((a, b) => a.value.localeCompare(b.value));
         setPeriodOptions((prev) => ({ ...prev, month: months }));
-      } else if (frame === 'week') {
-        const weeks = [...new Set(response.data.labels)]
-          .filter((label) => allowedYears.some((year) => label.includes(year)))
-          .map((label) => {
-            const [, weekNum] = label.split('-W');
-            return {
-              value: label,
-              label: `Tuần ${parseInt(weekNum)} (${label.split('-W')[0]})`,
-            };
-          })
-          .sort((a, b) => a.value.localeCompare(b.value));
-        setPeriodOptions((prev) => ({ ...prev, week: weeks }));
       }
+
+      setFinanceData(filteredData);
+      setCurrentPage(1);
     } catch (err) {
       addToast('Không thể tải dữ liệu tài chính: ' + (err.response?.data?.message || err.message));
       setFinanceData({ income: [], expenses: [], categories: [], transactions: [], labels: [] });
     }
   };
 
-  // Tải dữ liệu ban đầu cho cả month và week
+  // Hàm xử lý nhấp vào biểu đồ
+  const handleChartClick = (event) => {
+    if (timeFrame !== 'year') return;
+
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const elements = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, false);
+    if (elements.length > 0) {
+      const index = elements[0].index;
+      const year = financeData.labels[index];
+      setSelectedYear(year);
+      fetchFinanceData('month', year);
+      setTimeFrame('month');
+    }
+  };
+
+  // Tải dữ liệu ban đầu
   useEffect(() => {
     const loadInitialData = async () => {
-      await fetchFinanceData('month'); // Load month data
-      await fetchFinanceData('week'); // Load week data
-      fetchFinanceData(timeFrame); // Load current timeFrame
+      await fetchFinanceData('month');
+      await fetchFinanceData('week');
+      fetchFinanceData(timeFrame);
     };
     loadInitialData();
   }, []);
 
   // Tải dữ liệu khi timeFrame thay đổi
   useEffect(() => {
-    fetchFinanceData(timeFrame);
+    if (!selectedYear) {
+      fetchFinanceData(timeFrame);
+    }
   }, [timeFrame]);
 
   // Hàm so sánh hai khoảng thời gian
@@ -362,12 +404,13 @@ const Dashboard = () => {
       },
       title: {
         display: true,
-        text:
-          timeFrame === 'week'
-            ? 'Thu nhập & Chi tiêu Hàng tuần'
-            : timeFrame === 'year'
-            ? 'Thu nhập & Chi tiêu Hàng năm'
-            : 'Thu nhập & Chi tiêu Hàng tháng',
+        text: selectedYear
+          ? `Thu nhập & Chi tiêu ${timeFrame === 'week' ? 'Hàng tuần' : 'Hàng tháng'} năm ${selectedYear}`
+          : timeFrame === 'week'
+          ? 'Thu nhập & Chi tiêu Hàng tuần'
+          : timeFrame === 'year'
+          ? 'Thu nhập & Chi tiêu Hàng năm'
+          : 'Thu nhập & Chi tiêu Hàng tháng',
         font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' },
         padding: { top: 10, bottom: 20 },
         color: '#1a1a1a',
@@ -409,6 +452,14 @@ const Dashboard = () => {
           font: { size: 12, family: 'Helvetica, sans-serif' },
           color: '#555',
           padding: 10,
+          callback: (value, index) => {
+            const label = financeData.labels[index];
+            if (timeFrame === 'week') {
+              const weekNum = label.match(/Tuần (\d+)/)?.[1];
+              return weekNum ? `W${weekNum}` : label;
+            }
+            return label;
+          },
         },
         title: {
           display: true,
@@ -598,7 +649,10 @@ const Dashboard = () => {
                     <select
                       className="form-select w-auto"
                       value={timeFrame}
-                      onChange={(e) => setTimeFrame(e.target.value)}
+                      onChange={(e) => {
+                        setTimeFrame(e.target.value);
+                        setSelectedYear(null);
+                      }}
                     >
                       <option value="week">Tuần</option>
                       <option value="month">Tháng</option>
@@ -606,7 +660,12 @@ const Dashboard = () => {
                     </select>
                   </div>
                   <div style={{ width: '100%', height: '400px' }}>
-                    <Line data={lineChartData} options={chartOptions} />
+                    <Line
+                      ref={chartRef}
+                      data={lineChartData}
+                      options={chartOptions}
+                      onClick={handleChartClick}
+                    />
                   </div>
                 </div>
               </div>

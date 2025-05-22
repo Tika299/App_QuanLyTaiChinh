@@ -11,7 +11,7 @@ import Dashboard from './dashboard';
 import ResetPassword from './reset-password';
 import ForgotPasswordRequest from './password-request';
 import Home from './Home';
-// import Transaction from './Transaction';
+import Transaction from './Transaction';
 import UserList from './userlist';
 import PrivateRoute from './PrivateRoute';
 import Logout from './Logout';
@@ -37,6 +37,11 @@ function App() {
         <Route path="/dashboard" element={
           <PrivateRoute>
             <Dashboard />
+          </PrivateRoute>
+        } />
+        <Route path="/Transaction" element={
+          <PrivateRoute>
+            <Transaction />
           </PrivateRoute>
         } />
         <Route path="/logout" element={
