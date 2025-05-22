@@ -11,9 +11,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             UserRoleSeeder::class,
-            CategorySeeder::class,
-            TransactionSeeder::class,
-            GoalSeeder::class,
+           
         ]);
     }
 }
