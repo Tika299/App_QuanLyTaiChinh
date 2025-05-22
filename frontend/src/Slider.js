@@ -36,10 +36,10 @@ function Slider() {
                     withCredentials: true,
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                const roleName = response.data.roles?.[0]?.name || null;
+
                 setUserData({
                     username: response.data.username || "User",
-                    role: roleName,
+                    role: response.data.role || null,
                     avatar: response.data.avatar || null,
                 });
             } catch (err) {
