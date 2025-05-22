@@ -1,155 +1,138 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use App\Models\Role;
+use Illuminate\Validation\Rule;
 
 class CrudUserController extends Controller
 {
-    // Đăng ký người dùng
+    public function showLoginForm()
+    {
+        return view('auth.login');
+    }
+
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        if (Auth::attempt($request->only('email', 'password'))) {
+            return response()->json(['message' => 'Đăng nhập thành công!'], 200);
+        }
+
+        throw ValidationException::withMessages([
+            'email' => ['Email hoặc mật khẩu không đúng.'],
+        ]);
+    }
+
+    public function showRegisterForm()
+    {
+        return view('auth.register');
+    }
+
+    public function logout(Request $request)
+    {
+        Auth::logout();
+        return response()->json(['message' => 'Đăng xuất thành công!'], 200);
+    }
+
     public function signup(Request $request)
     {
         $request->validate([
             'username' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6|confirmed',
-            'role' => 'required|exists:roles,name',  // validate role có tồn tại trong bảng roles
         ]);
 
         $user = User::create([
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => 'user',
             'avatar' => 'default.png',
         ]);
 
-        // Gán role qua bảng trung gian
-        $role = Role::where('name', $request->role)->first();
-        if ($role) {
-            $user->roles()->attach($role->id);
-        }
-
-        return response()->json([
-            'message' => 'Đăng ký thành công!',
-            'user' => $user->load('roles'),  // trả về kèm role
-        ], 201);
+        Auth::login($user);
+        return response()->json(['message' => 'Đăng ký thành công!'], 201);
     }
 
-    // Đăng nhập
-    public function login(Request $request)
+    public function show(Request $request)
+{
+    $user = \App\Models\User::first(); // Lấy user đầu tiên
+    return response()->json($user ?: ['error' => 'Không có user']);
+}
+
+    public function update(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['error' => 'Vui lòng đăng nhập.'], 401);
+        }
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Email hoặc mật khẩu không đúng.'],
+        try {
+            $request->validate([
+                'username' => 'required|string|max:255',
+                'email' => [
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('users', 'email')->ignore($user->id),
+                ],
+                'phone' => [
+                    'nullable',
+                    'regex:/^0\d{9}$/',
+                ],
+                'city' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                    'regex:/^[a-zA-Z\sÀ-ỹ]+$/u',
+                ],
+                'bio' => 'nullable|string|max:1000',
+                'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ], [
+                'username.required' => 'Tên người dùng không được để trống.',
+                'email.required' => 'Email không được để trống.',
+                'email.email' => 'Email không đúng định dạng.',
+                'email.unique' => 'Email đã tồn tại, hãy nhập email khác.',
+                'phone.regex' => 'Số điện thoại phải là 10 chữ số và bắt đầu bằng 0.',
+                'city.regex' => 'Thành phố chỉ được chứa chữ cái, khoảng trắng và dấu tiếng Việt.',
+                'city.max' => 'Thành phố không được vượt quá 255 ký tự.',
+                'bio.max' => 'Giới thiệu không được vượt quá 1000 ký tự.',
+                'avatar.image' => 'Ảnh đại diện phải là hình ảnh.',
+                'avatar.mimes' => 'Ảnh đại diện phải có định dạng jpeg, png, jpg, hoặc gif.',
+                'avatar.max' => 'Ảnh đại diện không được vượt quá 2MB.',
             ]);
-        }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            $data = [
+                'username' => $request->username,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'city' => $request->city,
+                'bio' => $request->bio,
+            ];
 
-        return response()->json([
-            'message' => 'Đăng nhập thành công!',
-            'user' => $user,
-            'token' => $token,
-        ]);
-    }
-
-    // Đăng xuất
-    public function logout(Request $request)
-    {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'Đăng xuất thành công!']);
-    }
-
-    // Lấy danh sách người dùng
-    public function getUsers(Request $request)
-    {
-        $users = User::with('roles:id,name')
-            ->select('id', 'username', 'email', 'avatar')
-            ->paginate(2);
-
-        $users->getCollection()->transform(function ($user) {
-            $user->avatar = $user->avatar ?: 'default.png';
-            return $user;
-        });
-
-        return response()->json($users);
-    }
-
-
-
-    // Lấy thông tin một người dùng
-    public function getUser($id)
-    {
-        $user = User::with('roles:id,name')
-            ->select('id', 'username', 'email', 'avatar')
-            ->findOrFail($id);
-
-        $user->avatar = $user->avatar ?: 'default.png';
-
-        return response()->json($user);
-    }
-
-    // Cập nhật người dùng
-    public function updateUser(Request $request, $id)
-    {
-        $request->validate([
-            'username' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email,' . $id,
-            'role' => 'required|exists:roles,name',
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
-
-        $user = User::findOrFail($id);
-        $user->username = $request->username;
-        $user->email = $request->email;
-
-        if ($request->hasFile('avatar')) {
-            if ($user->avatar && $user->avatar !== 'default.png') {
-                Storage::disk('public')->delete('avatars/' . $user->avatar);
+            if ($request->hasFile('avatar')) {
+                if ($user->avatar && $user->avatar !== 'default.png' && Storage::exists('public/' . $user->avatar)) {
+                    Storage::delete('public/' . $user->avatar);
+                }
+                $data['avatar'] = $request->file('avatar')->store('avatars', 'public');
             }
-            $avatarPath = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = basename($avatarPath);
+
+            $user->update($data);
+            return response()->json(['message' => 'Hồ sơ đã được cập nhật!', 'user' => $user], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation error: ' . json_encode($e->errors()));
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Update user error: ' . $e->getMessage());
+            return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
-
-        $user->save();
-
-        // Cập nhật role
-        $role = Role::where('name', $request->role)->first();
-        if ($role) {
-            $user->roles()->sync([$role->id]);
-        }
-
-        return response()->json([
-            'message' => 'Cập nhật người dùng thành công!',
-            'user' => $user->load('roles'),
-        ]);
-    }
-
-
-    // Xóa người dùng
-    public function deleteUser($id)
-    {
-        $user = User::findOrFail($id);
-
-        if ($user->avatar && $user->avatar !== 'default.png') {
-            Storage::disk('public')->delete('avatars/' . $user->avatar);
-        }
-
-        $user->delete();
-
-        return response()->json(['message' => 'Xóa người dùng thành công!']);
     }
 }

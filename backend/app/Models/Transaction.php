@@ -9,20 +9,12 @@ class Transaction extends Model
 {
     use HasFactory;
 
-    protected $table = 'transactions';
-
     protected $fillable = [
         'user_id',
-        'category_id',
-        'amount',
         'name',
-        'description',
-    ];
-
-    protected $casts = [
-        'amount' => 'decimal:2',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'amount',
+        'category_id',
+        'description'
     ];
 
     public function user()

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Mục Tiêu Tài Chính</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-5">
+    <h2>Danh Sách Mục Tiêu Tài Chính</h2>
+
+    <!-- Nút thêm mục tiêu -->
+    <button class="btn btn-success mb-4" data-bs-toggle="modal" data-bs-target="#addGoalModal">Thêm Mục Tiêu</button>
+
+    <!-- Danh sách mục tiêu -->
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Tên Mục Tiêu</th>
+                <th>Loại Mục Tiêu</th>
+                <th>Danh Mục</th>
+                <th>Số Tiền</th>
+                <th>Hạn Hoàn Thành</th>
+                <th>Thao Tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Ví dụ mục tiêu -->
+            <tr>
+                <td>Tiết Kiệm Mua Xe</td>
+                <td>Chi Tiêu</td>
+                <td>Vận Tải</td>
+                <td>100,000,000</td>
+                <td>31/12/2025</td>
+                <td>
+                    <!-- Sửa mục tiêu -->
+                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#editGoalModal">Sửa</button>
+                    <!-- Xóa mục tiêu -->
+                    <button class="btn btn-danger">Xóa</button>
+                </td>
+            </tr>
+
+            <!-- Thêm các mục tiêu khác ở đây -->
+        </tbody>
+    </table>
+
+    <!-- Modal Thêm Mục Tiêu -->
+    <div class="modal fade" id="addGoalModal" tabindex="-1" aria-labelledby="addGoalModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addGoalModalLabel">Thêm Mục Tiêu Mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="goalName" class="form-label">Tên Mục Tiêu:</label>
+                            <input type="text" class="form-control" id="goalName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="goalType" class="form-label">Loại Mục Tiêu:</label>
+                            <select class="form-control" id="goalType" required>
+                                <option value="income">Thu Nhập</option>
+                                <option value="expense">Chi Tiêu</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="goalCategory" class="form-label">Danh Mục:</label>
+                            <select class="form-control" id="goalCategory" required>
+                                <option value="1">Danh mục 1</option>
+                                <option value="2">Danh mục 2</option>
+                                <option value="3">Danh mục 3</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="goalAmount" class="form-label">Số Tiền:</label>
+                            <input type="number" class="form-control" id="goalAmount" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="goalDueDate" class="form-label">Hạn Hoàn Thành:</label>
+                            <input type="date" class="form-control" id="goalDueDate" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Thêm Mục Tiêu</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Sửa Mục Tiêu -->
+    <div class="modal fade" id="editGoalModal" tabindex="-1" aria-labelledby="editGoalModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editGoalModalLabel">Sửa Mục Tiêu</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="editGoalName" class="form-label">Tên Mục Tiêu:</label>
+                            <input type="text" class="form-control" id="editGoalName" value="Tiết Kiệm Mua Xe" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGoalType" class="form-label">Loại Mục Tiêu:</label>
+                            <select class="form-control" id="editGoalType" required>
+                                <option value="income">Thu Nhập</option>
+                                <option value="expense" selected>Chi Tiêu</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGoalCategory" class="form-label">Danh Mục:</label>
+                            <select class="form-control" id="editGoalCategory" required>
+                                <option value="1">Danh mục 1</option>
+                                <option value="2" selected>Danh mục 2</option>
+                                <option value="3">Danh mục 3</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGoalAmount" class="form-label">Số Tiền:</label>
+                            <input type="number" class="form-control" id="editGoalAmount" value="100000000" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGoalDueDate" class="form-label">Hạn Hoàn Thành:</label>
+                            <input type="date" class="form-control" id="editGoalDueDate" value="2025-12-31" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Cập Nhật Mục Tiêu</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
