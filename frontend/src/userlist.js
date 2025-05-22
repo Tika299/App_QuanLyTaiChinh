@@ -3,11 +3,14 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const ViewModal = ({ selectedUser }) => {
-  const getAvatarUrl = (avatar) =>
-    avatar && avatar !== 'null' && avatar !== 'undefined'
-      ? `http://127.0.0.1:8000/storage/avatars/${avatar}`
-      : 'http://127.0.0.1:8000/storage/avatars/default.png';
+  const getAvatarUrl = useCallback((avatar) => {
+    if (!avatar || avatar === 'null' || avatar === 'undefined') {
+      return 'http://127.0.0.1:8000/storage/avatars/default.png';
+    }
 
+    const cleanAvatar = avatar.split('?')[0]; // Xoá ?t= cũ nếu có
+    return `http://127.0.0.1:8000/storage/avatars/${cleanAvatar}?t=${Date.now()}`;
+  }, []);
   return (
     <div className="modal fade" id="viewModal" tabIndex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
       <div className="modal-dialog">
@@ -99,7 +102,7 @@ const EditModal = ({ editForm, handleEditChange, handleEditSubmit, errors }) => 
                 onChange={handleEditChange}
                 required
               >
-                <option value="user">Người dùng</option>
+                <option value="member">Người dùng</option>
                 <option value="admin">Quản trị viên</option>
               </select>
             </div>
@@ -141,75 +144,104 @@ const UserList = () => {
   const prevUsers = useRef([]);
   const navigate = useNavigate();
 
-  const getAvatarUrl = useCallback((avatar) =>
-    avatar && avatar !== 'null' && avatar !== 'undefined'
-      ? `http://127.0.0.1:8000/storage/avatars/${avatar}`
-      : 'http://127.0.0.1:8000/storage/avatars/default.png', []
+  const getAvatarUrl = useCallback(
+    (avatar) =>
+      avatar && avatar !== 'null' && avatar !== 'undefined'
+        ? `http://127.0.0.1:8000/storage/avatars/${avatar}`
+        : 'http://127.0.0.1:8000/storage/avatars/default.png',
+    []
   );
 
-  const fetchUsers = useCallback(async (page = 1) => {
-    if (isFetching.current) return;
-    isFetching.current = true;
+  const fetchUsers = useCallback(
+    async (page = 1) => {
+      if (isFetching.current) return;
+      isFetching.current = true;
+      setLoading(true);
+      setError(null);
 
-    try {
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
-        withCredentials: true,
-      });
+      try {
+        await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+          withCredentials: true,
+        });
 
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại.');
-        window.location.href = '/';
-        return;
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Vui lòng đăng nhập lại.');
+          navigate('/');
+          return;
+        }
+
+        const config = {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        };
+
+        console.log(`Gửi yêu cầu: GET /api/listuser?page=${page}`);
+        const response = await axios.get(`http://127.0.0.1:8000/api/listuser?page=${page}`, config);
+        console.log('Phản hồi:', response.data);
+
+        const newUsers = (response.data.data || []).map((user) => {
+          const roleName = user.roles && user.roles.length > 0 ? user.roles[0].name : user.role || 'user';
+          return { ...user, role: roleName };
+        });
+
+        if (JSON.stringify(newUsers) !== JSON.stringify(prevUsers.current)) {
+          setUsers(newUsers);
+          prevUsers.current = newUsers;
+        }
+        setLastPage(response.data.last_page || 1);
+      } catch (err) {
+        console.error('Lỗi fetchUsers:', err.response || err.message);
+        const errorMessage = err.response
+          ? `Lỗi ${err.response.status}: ${err.response.data.message || err.response.statusText}`
+          : `Lỗi kết nối: ${err.message}`;
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+        isFetching.current = false;
       }
-
-      const config = {
-        withCredentials: true,
-        headers: { Authorization: `Bearer ${token}` },
-      };
-
-      const response = await axios.get(`http://127.0.0.1:8000/api/listuser?page=${page}`, config);
-      const newUsers = response.data.data || [];
-
-      if (JSON.stringify(newUsers) !== JSON.stringify(prevUsers.current)) {
-        setUsers(newUsers);
-        prevUsers.current = newUsers;
-      }
-      setLastPage(response.data.last_page || 1);
-      setLoading(false);
-    } catch (err) {
-      const errorMessage = err.response
-        ? `Lỗi ${err.response.status}: ${err.response.data.message || err.response.statusText}`
-        : `Lỗi kết nối: ${err.message}`;
-      setError(errorMessage);
-      setLoading(false);
-    } finally {
-      isFetching.current = false;
-    }
-  }, []);
+    },
+    [navigate]
+  );
 
   useEffect(() => {
-    setLoading(true);
     fetchUsers(currentPage);
   }, [currentPage, fetchUsers]);
 
-  const handleView = useCallback(async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại.');
-        return;
-      }
+  const handleView = useCallback(
+    async (id) => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Vui lòng đăng nhập lại.');
+          return;
+        }
 
-      const response = await axios.get(`http://127.0.0.1:8000/api/listuser/${id}`, {
-        withCredentials: true,
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setSelectedUser(response.data);
-    } catch (err) {
-      setError('Không thể tải thông tin người dùng: ' + (err.response?.data?.message || err.message));
-    }
-  }, []);
+        const config = {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        };
+
+        console.log(`Gửi yêu cầu: GET /api/listuser/${id}`);
+        const response = await axios.get(`http://127.0.0.1:8000/api/listuser/${id}`, config);
+        console.log('Phản hồi:', response.data);
+
+        const user = response.data;
+        const roleName = user.roles && user.roles.length > 0 ? user.roles[0].name : user.role || 'user';
+        setSelectedUser({ ...user, role: roleName });
+      } catch (err) {
+        console.error('Lỗi handleView:', err.response || err.message);
+        setError('Không thể tải thông tin người dùng: ' + (err.response?.data?.message || err.message));
+      }
+    },
+    []
+  );
 
   const handleEdit = useCallback((user) => {
     setEditForm({
@@ -219,7 +251,7 @@ const UserList = () => {
       role: user.role,
       avatar: null,
     });
-    setEditErrors(null); // Xóa lỗi cũ khi mở modal
+    setEditErrors(null);
   }, []);
 
   const handleEditChange = useCallback((e) => {
@@ -230,156 +262,134 @@ const UserList = () => {
     }));
   }, []);
 
-  const handleEditSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    setEditErrors(null); // Xóa lỗi cũ trước khi gửi
-
-    // Kiểm tra dữ liệu trước khi gửi
-    if (!editForm.username.trim()) {
-      setEditErrors({ username: ['Tên người dùng là bắt buộc'] });
-      return;
-    }
-    if (!editForm.email.trim()) {
-      setEditErrors({ email: ['Email là bắt buộc'] });
-      return;
-    }
-    if (!['user', 'admin'].includes(editForm.role)) {
-      setEditErrors({ role: ['Vai trò không hợp lệ'] });
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại.');
-        return;
-      }
-
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
-        withCredentials: true,
-      });
-
-      const formData = new FormData();
-      formData.append('username', editForm.username.trim());
-      formData.append('email', editForm.email.trim());
-      formData.append('role', editForm.role);
-      formData.append('_method', 'PUT'); // Laravel yêu cầu cho PUT qua multipart
-      if (editForm.avatar) {
-        formData.append('avatar', editForm.avatar);
-      }
-
-      await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, {
-        withCredentials: true,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      fetchUsers(currentPage);
-      setError(null);
+  const handleEditSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
       setEditErrors(null);
-      document.querySelector('#editModal .btn-close').click();
-    } catch (err) {
-      if (err.response && err.response.status === 422) {
-        setEditErrors(err.response.data.errors || { general: ['Dữ liệu không hợp lệ'] });
-      } else {
-        setError('Không thể cập nhật người dùng: ' + (err.response?.data?.message || err.message));
-      }
-    }
-  }, [editForm, currentPage, fetchUsers]);
 
-  const handleDelete = useCallback(async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa người dùng này?')) return;
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại.');
+      if (!editForm.username.trim()) {
+        setEditErrors({ username: ['Tên người dùng là bắt buộc'] });
+        return;
+      }
+      if (!editForm.email.trim()) {
+        setEditErrors({ email: ['Email là bắt buộc'] });
         return;
       }
 
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
-        withCredentials: true,
-      });
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setEditErrors({ general: ['Vui lòng đăng nhập lại.'] });
+          return;
+        }
 
-      await axios.delete(`http://127.0.0.1:8000/api/delete/${id}`, {
-        withCredentials: true,
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        const formData = new FormData();
+        formData.append('username', editForm.username);
+        formData.append('email', editForm.email);
+        formData.append('role', editForm.role);
+        if (editForm.avatar) {
+          console.log('Avatar:', editForm.avatar); // Debug file
+          formData.append('avatar', editForm.avatar);
+        }
+        formData.append('_method', 'PUT'); // Thêm để hỗ trợ giả lập PUT nếu cần
 
-      fetchUsers(currentPage);
-      setError(null);
-    } catch (err) {
-      setError('Không thể xóa người dùng: ' + (err.response?.data?.message || err.message));
-    }
-  }, [currentPage, fetchUsers]);
+        const config = {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        };
 
-  const handleLogout = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại.');
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
-        return;
+        console.log('Gửi yêu cầu: PUT /api/update/' + editForm.id);
+        console.log('FormData:', [...formData.entries()]); // Debug FormData
+        const response = await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, config);
+
+        console.log('Phản hồi:', response.data);
+
+        const editModalEl = document.getElementById('editModal');
+        if (editModalEl) {
+          const modal = window.bootstrap.Modal.getInstance(editModalEl);
+          modal.hide();
+        }
+
+        fetchUsers(currentPage);
+      } catch (err) {
+        console.error('Lỗi handleEditSubmit:', err.response || err.message);
+        if (err.response && err.response.data && err.response.data.errors) {
+          console.log('Chi tiết lỗi:', err.response.data.errors); // Debug lỗi 422
+          setEditErrors(err.response.data.errors);
+        } else {
+          setEditErrors({ general: [err.response?.data?.message || err.message] });
+        }
       }
+    },
+    [editForm, fetchUsers, currentPage]
+  );
 
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
-        withCredentials: true,
-      });
+  const handleDelete = useCallback(
+    async (id) => {
+      if (!window.confirm('Bạn có chắc muốn xóa người dùng này?')) return;
 
-      await axios.post('http://127.0.0.1:8000/api/logout', {}, {
-        withCredentials: true,
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Vui lòng đăng nhập lại.');
+          return;
+        }
 
-      console.log('UserList.js: Đăng xuất thành công');
-      localStorage.removeItem('token');
-      window.location.href = '/';
-    } catch (err) {
-      setError('Không thể đăng xuất: ' + (err.response?.data?.message || err.message));
-      localStorage.removeItem('token');
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 2000);
-    }
-  }, []);
+        const config = {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        };
 
-  const handlePageChange = useCallback((page) => {
-    if (page >= 1 && page <= lastPage && page !== currentPage) {
-      setCurrentPage(page);
-      setLoading(true);
-    }
-  }, [lastPage, currentPage]);
+        console.log(`Gửi yêu cầu: DELETE /api/delete/${id}`);
+        await axios.delete(`http://127.0.0.1:8000/api/delete/${id}`, config);
 
-  const handleBackToHome = useCallback(() => {
-    navigate('/Home');
-  }, [navigate]);
+        fetchUsers(currentPage);
+      } catch (err) {
+        console.error('Lỗi handleDelete:', err.response || err.message);
+        setError('Không thể xóa người dùng: ' + (err.response?.data?.message || err.message));
+      }
+    },
+    [fetchUsers, currentPage]
+  );
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/');
+  };
+
+  const handleGoHome = () => {
+    navigate('/home');
+  };
 
   return (
-    <div className="container my-5">
-      <h3 className="text-center mb-4" style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700 }}>
-        Danh sách tài khoản
-      </h3>
-      <div className="text-start mb-3">
-        <button className="btn btn-primary me-2" onClick={handleBackToHome}>
-          <i className="bi bi-arrow-left me-2"></i>Quay lại
+    <div className="container mt-4">
+      <h2>Danh sách người dùng</h2>
+
+      <div className="mb-3 d-flex justify-content-between">
+        <button className="btn btn-secondary" onClick={handleGoHome}>
+          Quay lại Home
         </button>
         <button className="btn btn-danger" onClick={handleLogout}>
           Đăng xuất
         </button>
       </div>
+
       {error && <div className="alert alert-danger">{error}</div>}
-      {loading && <div className="alert alert-info text-center">Đang tải...</div>}
-      {!loading && users.length === 0 && !error && (
-        <div className="alert alert-info text-center">Không có người dùng nào.</div>
-      )}
-      {!loading && users.length > 0 && (
-        <div className="table-responsive">
-          <table className="table table-striped table-bordered table-hover">
-            <thead className="table-dark">
+
+      {loading ? (
+        <p>Đang tải dữ liệu...</p>
+      ) : (
+        <>
+          <table className="table table-striped table-bordered">
+            <thead>
               <tr>
+                <th>ID</th>
                 <th>Tên người dùng</th>
                 <th>Email</th>
                 <th>Vai trò</th>
@@ -388,8 +398,16 @@ const UserList = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="text-center">
+                    Không có người dùng nào
+                  </td>
+                </tr>
+              )}
+              {users.map((user) => (
                 <tr key={user.id}>
+                  <td>{user.id}</td>
                   <td>{user.username}</td>
                   <td>{user.email}</td>
                   <td>{user.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}</td>
@@ -397,13 +415,12 @@ const UserList = () => {
                     <img
                       src={getAvatarUrl(user.avatar)}
                       alt={user.username}
-                      className="rounded-circle"
-                      style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                      style={{ maxWidth: '50px', borderRadius: '50%' }}
                     />
                   </td>
                   <td>
                     <button
-                      className="btn btn-info btn-sm me-1"
+                      className="btn btn-info btn-sm me-2"
                       data-bs-toggle="modal"
                       data-bs-target="#viewModal"
                       onClick={() => handleView(user.id)}
@@ -411,7 +428,7 @@ const UserList = () => {
                       Xem
                     </button>
                     <button
-                      className="btn btn-warning btn-sm me-1"
+                      className="btn btn-warning btn-sm me-2"
                       data-bs-toggle="modal"
                       data-bs-target="#editModal"
                       onClick={() => handleEdit(user)}
@@ -429,31 +446,50 @@ const UserList = () => {
               ))}
             </tbody>
           </table>
-        </div>
+
+          {users.length > 0 && lastPage > 1 && (
+            <nav aria-label="User list pagination" className="mt-3">
+              <ul className="pagination justify-content-center">
+                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Trước
+                  </button>
+                </li>
+                {Array.from({ length: lastPage }, (_, i) => i + 1).map((page) => (
+                  <li
+                    key={page}
+                    className={`page-item ${currentPage === page ? 'active' : ''}`}
+                  >
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  </li>
+                ))}
+                <li className={`page-item ${currentPage === lastPage ? 'disabled' : ''}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, lastPage))}
+                    disabled={currentPage === lastPage}
+                  >
+                    Sau
+                  </button>
+                </li>
+              </ul>
+              <div className="text-center">
+                Trang {currentPage} / {lastPage}
+              </div>
+            </nav>
+          )}
+        </>
       )}
-      {!loading && lastPage > 1 && (
-        <nav aria-label="Page navigation">
-          <ul className="pagination justify-content-center">
-            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => handlePageChange(currentPage - 1)}>
-                Trước
-              </button>
-            </li>
-            {[...Array(lastPage).keys()].map((page) => (
-              <li key={page + 1} className={`page-item ${currentPage === page + 1 ? 'active' : ''}`}>
-                <button className="page-link" onClick={() => handlePageChange(page + 1)}>
-                  {page + 1}
-                </button>
-              </li>
-            ))}
-            <li className={`page-item ${currentPage === lastPage ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => handlePageChange(currentPage + 1)}>
-                Sau
-              </button>
-            </li>
-          </ul>
-        </nav>
-      )}
+
       <ViewModal selectedUser={selectedUser} />
       <EditModal
         editForm={editForm}

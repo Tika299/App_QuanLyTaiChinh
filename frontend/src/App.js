@@ -34,14 +34,14 @@ function App() {
             <Home />
           </PrivateRoute>
         } />
-        <Route path="/transactions" element={
-          <PrivateRoute>
-            <Transaction />
-          </PrivateRoute>
-        } />
         <Route path="/dashboard" element={
           <PrivateRoute>
             <Dashboard />
+          </PrivateRoute>
+        } />
+        <Route path="/Transaction" element={
+          <PrivateRoute>
+            <Transaction />
           </PrivateRoute>
         } />
         <Route path="/logout" element={

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -64,6 +64,7 @@ const Dashboard = () => {
     expenses: [],
     categories: [],
     transactions: [],
+    labels: [],
   });
   const [compareData, setCompareData] = useState(null);
   const [selectedPeriods, setSelectedPeriods] = useState({
@@ -71,10 +72,32 @@ const Dashboard = () => {
     period2: '',
     type: 'month',
   });
-  const [error, setError] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [periodOptions, setPeriodOptions] = useState({
+    month: [],
+    week: [],
+  });
+  const [selectedYear, setSelectedYear] = useState(null);
+  const chartRef = useRef(null);
+  const itemsPerPage = 5;
+
+  // Hàm thêm toast
+  const addToast = (message, type = 'danger') => {
+    const id = Date.now().toString();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 5000);
+  };
+
+  // Hàm xóa toast
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
 
   // Hàm lấy dữ liệu từ API
-  const fetchFinanceData = async (frame) => {
+  const fetchFinanceData = async (frame, year = null) => {
     try {
       await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
         withCredentials: true,
@@ -82,28 +105,138 @@ const Dashboard = () => {
 
       const token = localStorage.getItem('token');
       if (!token) {
-        setError('Vui lòng đăng nhập lại.');
+        addToast('Vui lòng đăng nhập lại.');
         window.location.href = '/';
         return;
       }
 
-      const response = await axios.get(`http://127.0.0.1:8000/api/finance?type=${frame}`, {
+      const url = year
+        ? `http://127.0.0.1:8000/api/finance?type=${frame}&year=${year}`
+        : `http://127.0.0.1:8000/api/finance?type=${frame}`;
+
+      const response = await axios.get(url, {
         withCredentials: true,
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setFinanceData(response.data);
-      setError(null);
+      let filteredData = response.data;
+      if (frame === 'year' && !year) {
+        const allowedYears = ['2024', '2025'];
+        filteredData = {
+          labels: response.data.labels.filter((label) =>
+            allowedYears.includes(label)
+          ),
+          income: response.data.income.slice(0, response.data.labels.length).filter((_, i) =>
+            allowedYears.includes(response.data.labels[i])
+          ),
+          expenses: response.data.expenses.slice(0, response.data.labels.length).filter((_, i) =>
+            allowedYears.includes(response.data.labels[i])
+          ),
+          categories: response.data.categories,
+          transactions: response.data.transactions.filter((t) =>
+            allowedYears.some((year) => t.date.startsWith(year))
+          ),
+        };
+      }
+
+      // Xử lý dữ liệu tuần, chỉ lấy các tuần có dữ liệu (tối đa 25 tuần)
+      if (frame === 'week') {
+        const weeks = [...new Set(response.data.labels)]
+          .filter((label) => {
+            if (year && !label.includes(year)) return false;
+            const [, weekNum] = label.split('-W');
+            const weekNumber = parseInt(weekNum, 10);
+            return weekNumber <= 25; // Chỉ lấy đến tuần 25
+          })
+          .map((label) => {
+            const [, weekNum] = label.split('-W');
+            const weekNumber = parseInt(weekNum, 10);
+            return {
+              value: label,
+              label: `Tuần ${weekNumber} (${label.split('-W')[0]})`,
+              weekNum: weekNumber,
+              year: label.split('-W')[0],
+            };
+          })
+          .sort((a, b) => {
+            // Sắp xếp theo năm trước, sau đó theo tuần
+            if (a.year !== b.year) return a.year.localeCompare(b.year);
+            return a.weekNum - b.weekNum;
+          });
+
+        filteredData = {
+          ...response.data,
+          labels: weeks.map((w) => w.label),
+          income: weeks.map((w) => response.data.income[response.data.labels.indexOf(w.value)] || 0),
+          expenses: weeks.map((w) => response.data.expenses[response.data.labels.indexOf(w.value)] || 0),
+        };
+
+        setPeriodOptions((prev) => ({ ...prev, week: weeks }));
+      } else if (frame === 'month') {
+        const months = [...new Set(response.data.labels)]
+          .filter((label) => (year ? label.includes(year) : true))
+          .map((label) => {
+            const [month, year] = label.split('/');
+            return {
+              value: `${year}-${month.padStart(2, '0')}`,
+              label: `Tháng ${parseInt(month)}/${year}`,
+            };
+          })
+          .sort((a, b) => a.value.localeCompare(b.value));
+        setPeriodOptions((prev) => ({ ...prev, month: months }));
+      }
+
+      setFinanceData(filteredData);
+      setCurrentPage(1);
     } catch (err) {
-      setError('Không thể tải dữ liệu tài chính: ' + (err.response?.data?.message || err.message));
-      setFinanceData({ income: [], expenses: [], categories: [], transactions: [] });
+      addToast('Không thể tải dữ liệu tài chính: ' + (err.response?.data?.message || err.message));
+      setFinanceData({ income: [], expenses: [], categories: [], transactions: [], labels: [] });
     }
   };
+
+  // Hàm xử lý nhấp vào biểu đồ
+  const handleChartClick = (event) => {
+    if (timeFrame !== 'year') return;
+
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const elements = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, false);
+    if (elements.length > 0) {
+      const index = elements[0].index;
+      const year = financeData.labels[index];
+      setSelectedYear(year);
+      fetchFinanceData('month', year);
+      setTimeFrame('month');
+    }
+  };
+
+  // Tải dữ liệu ban đầu
+  useEffect(() => {
+    const loadInitialData = async () => {
+      await fetchFinanceData('month');
+      await fetchFinanceData('week');
+      fetchFinanceData(timeFrame);
+    };
+    loadInitialData();
+  }, []);
+
+  // Tải dữ liệu khi timeFrame thay đổi
+  useEffect(() => {
+    if (!selectedYear) {
+      fetchFinanceData(timeFrame);
+    }
+  }, [timeFrame]);
 
   // Hàm so sánh hai khoảng thời gian
   const comparePeriods = async () => {
     if (!selectedPeriods.period1 || !selectedPeriods.period2) {
-      setError('Vui lòng chọn cả hai khoảng thời gian.');
+      addToast('Vui lòng chọn cả hai khoảng thời gian.');
+      return;
+    }
+
+    if (selectedPeriods.period1 === selectedPeriods.period2) {
+      addToast('Vui lòng chọn hai khoảng thời gian khác nhau.');
       return;
     }
 
@@ -114,7 +247,7 @@ const Dashboard = () => {
 
       const token = localStorage.getItem('token');
       if (!token) {
-        setError('Vui lòng đăng nhập lại.');
+        addToast('Vui lòng đăng nhập lại.');
         window.location.href = '/';
         return;
       }
@@ -127,18 +260,40 @@ const Dashboard = () => {
         }
       );
 
-      setCompareData(response.data);
-      setError(null);
+      if (
+        response.data &&
+        response.data.period1 &&
+        response.data.period2 &&
+        typeof response.data.period1.income === 'number' &&
+        typeof response.data.period1.expenses === 'number' &&
+        typeof response.data.period2.income === 'number' &&
+        typeof response.data.period2.expenses === 'number'
+      ) {
+        setCompareData(response.data);
+      } else {
+        addToast('Dữ liệu so sánh không hợp lệ.');
+      }
     } catch (err) {
-      setError('Không thể so sánh: ' + (err.response?.data?.message || err.message));
-      setCompareData(null);
+      const errorMessage =
+        err.response?.data?.message.includes('Định dạng tuần không hợp lệ')
+          ? 'Không thể so sánh: Vui lòng chọn tuần hợp lệ (YYYY-WWW).'
+          : err.response?.data?.message.includes('Định dạng tháng không hợp lệ')
+          ? 'Không thể so sánh: Vui lòng chọn tháng hợp lệ (YYYY-MM).'
+          : err.response?.data?.message.includes('khác nhau')
+          ? 'Không thể so sánh: Vui lòng chọn hai khoảng thời gian khác nhau.'
+          : 'Không thể so sánh: ' + (err.response?.data?.message || err.message);
+      addToast(errorMessage);
     }
   };
 
-  // Tải dữ liệu khi timeFrame thay đổi
+  // Khởi tạo Bootstrap Toast
   useEffect(() => {
-    fetchFinanceData(timeFrame);
-  }, [timeFrame]);
+    const toastElements = document.querySelectorAll('.toast');
+    toastElements.forEach((toastEl) => {
+      const bootstrapToast = new window.bootstrap.Toast(toastEl);
+      bootstrapToast.show();
+    });
+  }, [toasts]);
 
   // Tổng quan tài chính
   const totalIncome = financeData.income.reduce((sum, val) => sum + val, 0);
@@ -147,7 +302,6 @@ const Dashboard = () => {
 
   // Dữ liệu biểu đồ Line Chart
   const getLabels = () => financeData.labels || [];
-
 
   const lineChartData = {
     labels: getLabels(),
@@ -183,12 +337,26 @@ const Dashboard = () => {
     ],
   };
 
+  // Xử lý danh mục để loại bỏ trùng lặp
+  const uniqueCategories = Object.values(
+    financeData.categories.reduce((acc, category) => {
+      if (category && category.name) {
+        if (acc[category.name]) {
+          acc[category.name].value += category.value;
+        } else {
+          acc[category.name] = { name: category.name, value: category.value };
+        }
+      }
+      return acc;
+    }, {})
+  );
+
   // Dữ liệu biểu đồ Pie Chart (danh mục)
   const pieChartData = {
-    labels: financeData.categories.map((cat) => cat.name),
+    labels: uniqueCategories.map((cat) => cat.name),
     datasets: [
       {
-        data: financeData.categories.map((cat) => cat.value),
+        data: uniqueCategories.map((cat) => cat.value),
         backgroundColor: ['#EF4444', '#F59E0B', '#10B981', '#3B82F6'],
         borderColor: '#fff',
         borderWidth: 2,
@@ -236,12 +404,13 @@ const Dashboard = () => {
       },
       title: {
         display: true,
-        text:
-          timeFrame === 'week'
-            ? 'Thu nhập & Chi tiêu Hàng tuần'
-            : timeFrame === 'year'
-            ? 'Thu nhập & Chi tiêu Hàng năm'
-            : 'Thu nhập & Chi tiêu Hàng tháng',
+        text: selectedYear
+          ? `Thu nhập & Chi tiêu ${timeFrame === 'week' ? 'Hàng tuần' : 'Hàng tháng'} năm ${selectedYear}`
+          : timeFrame === 'week'
+          ? 'Thu nhập & Chi tiêu Hàng tuần'
+          : timeFrame === 'year'
+          ? 'Thu nhập & Chi tiêu Hàng năm'
+          : 'Thu nhập & Chi tiêu Hàng tháng',
         font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' },
         padding: { top: 10, bottom: 20 },
         color: '#1a1a1a',
@@ -283,6 +452,14 @@ const Dashboard = () => {
           font: { size: 12, family: 'Helvetica, sans-serif' },
           color: '#555',
           padding: 10,
+          callback: (value, index) => {
+            const label = financeData.labels[index];
+            if (timeFrame === 'week') {
+              const weekNum = label.match(/Tuần (\d+)/)?.[1];
+              return weekNum ? `W${weekNum}` : label;
+            }
+            return label;
+          },
         },
         title: {
           display: true,
@@ -327,7 +504,10 @@ const Dashboard = () => {
         cornerRadius: 10,
         boxPadding: 8,
         callbacks: {
-          label: (context) => `${context.label}: ${context.parsed}₫ (${context.dataset.data[context.dataIndex] / context.dataset.data.reduce((a, b) => a + b, 0) * 100}%)`,
+          label: (context) =>
+            `${context.label}: ${context.parsed}₫ (${(
+              (context.parsed / context.dataset.data.reduce((a, b) => a + b, 0)) * 100
+            ).toFixed(2)}%)`,
         },
       },
     },
@@ -404,10 +584,17 @@ const Dashboard = () => {
     animation: { duration: 1500, easing: 'easeInOutQuart' },
   };
 
-  // Tùy chọn dropdown so sánh
-  const periodOptions = {
-    month: financeData.income.map((_, i) => ({ value: `2025-${i + 1}`, label: `Tháng ${i + 1}` })),
-    week: financeData.income.map((_, i) => ({ value: `week-${i + 1}`, label: `Tuần ${i + 1}` })),
+  // Phân trang cho lịch sử giao dịch
+  const totalItems = financeData.transactions.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = financeData.transactions.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
   return (
@@ -421,12 +608,35 @@ const Dashboard = () => {
       <div className="flex-grow-1">
         <Header />
         <div className="p-4">
-          {/* Error Message */}
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
+          {/* Toast Container */}
+          <div
+            className="toast-container position-fixed top-0 end-0 p-3"
+            style={{ zIndex: 1050 }}
+          >
+            {toasts.map((toast) => (
+              <div
+                key={toast.id}
+                className={`toast bg-${toast.type} text-white`}
+                role="alert"
+                aria-live="assertive"
+                aria-atomic="true"
+                data-bs-autohide="true"
+                data-bs-delay="5000"
+              >
+                <div className="toast-header">
+                  <strong className="me-auto">Thông báo</strong>
+                  <button
+                    type="button"
+                    className="btn-close btn-close-white"
+                    data-bs-dismiss="toast"
+                    aria-label="Close"
+                    onClick={() => removeToast(toast.id)}
+                  ></button>
+                </div>
+                <div className="toast-body">{toast.message}</div>
+              </div>
+            ))}
+          </div>
 
           {/* Chart and Summary Row */}
           <div className="row g-4 mb-4">
@@ -439,7 +649,10 @@ const Dashboard = () => {
                     <select
                       className="form-select w-auto"
                       value={timeFrame}
-                      onChange={(e) => setTimeFrame(e.target.value)}
+                      onChange={(e) => {
+                        setTimeFrame(e.target.value);
+                        setSelectedYear(null);
+                      }}
                     >
                       <option value="week">Tuần</option>
                       <option value="month">Tháng</option>
@@ -447,7 +660,12 @@ const Dashboard = () => {
                     </select>
                   </div>
                   <div style={{ width: '100%', height: '400px' }}>
-                    <Line data={lineChartData} options={chartOptions} />
+                    <Line
+                      ref={chartRef}
+                      data={lineChartData}
+                      options={chartOptions}
+                      onClick={handleChartClick}
+                    />
                   </div>
                 </div>
               </div>
@@ -619,8 +837,8 @@ const Dashboard = () => {
           <div className="mb-4">
             <h4 className="mb-4 text-dark">Phân loại chi tiêu</h4>
             <div className="row g-3 mb-4">
-              {financeData.categories.map((category) => (
-                <div key={category.name} className="col-md-3 col-sm-6">
+              {uniqueCategories.map((category, index) => (
+                <div key={`${category.name}-${index}`} className="col-md-3 col-sm-6">
                   <div
                     className={`card text-white ${
                       category.name === 'Ăn uống'
@@ -659,7 +877,7 @@ const Dashboard = () => {
                       ></i>
                       <div>
                         <h5 className="card-title mb-1">{category.name}</h5>
-                        <p className="card-text mb-0">{category.percent}%</p>
+                        <p className="card-text mb-0">{category.value.toLocaleString()}₫</p>
                       </div>
                     </div>
                   </div>
@@ -692,7 +910,7 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {financeData.transactions.map((row, index) => (
+                      {paginatedTransactions.map((row, index) => (
                         <tr
                           key={index}
                           style={{
@@ -713,12 +931,53 @@ const Dashboard = () => {
                           </td>
                           <td className="px-4 py-3">{row.category}</td>
                           <td className="px-4 py-3">{row.amount}₫</td>
-                          <td className="px-4 py-3">{row.note}</td>
+                          <td className="px-4 py-3">{row.description}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <nav aria-label="Transaction history pagination" className="mt-3">
+                    <ul className="pagination justify-content-center">
+                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                        <button
+                          className="page-link"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        >
+                          Trước
+                        </button>
+                      </li>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <li
+                          key={page}
+                          className={`page-item ${currentPage === page ? 'active' : ''}`}
+                        >
+                          <button
+                            className="page-link"
+                            onClick={() => handlePageChange(page)}
+                          >
+                            {page}
+                          </button>
+                        </li>
+                      ))}
+                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                        <button
+                          className="page-link"
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                        >
+                          Sau
+                        </button>
+                      </li>
+                    </ul>
+                    <div className="text-center">
+                      Trang {currentPage} / {totalPages}
+                    </div>
+                  </nav>
+                )}
               </div>
             </div>
           </div>

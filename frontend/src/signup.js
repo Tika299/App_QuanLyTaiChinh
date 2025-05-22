@@ -9,17 +9,39 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
   const [role, setRole] = useState('');
 
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
+
+    // Kiểm tra trống
+    if (!username || !email || !password || !confirmPassword || !role) {
+      toast.warn('Vui lòng điền đầy đủ thông tin.', { position: 'top-right' });
+      return;
+    }
+
+    // Ràng buộc độ dài
+    if (username.length > 50) {
+      toast.warn('Tên người dùng không được vượt quá 50 ký tự.', { position: 'top-right' });
+      return;
+    }
+    if (email.length > 100) {
+      toast.warn('Email không được vượt quá 100 ký tự.', { position: 'top-right' });
+      return;
+    }
+    if (password.length < 6) {
+      toast.warn('Mật khẩu phải có ít nhất 6 ký tự.', { position: 'top-right' });
+      return;
+    }
+    if (password.length > 100) {
+      toast.warn('Mật khẩu không được vượt quá 100 ký tự.', { position: 'top-right' });
+      return;
+    }
 
     if (password !== confirmPassword) {
-      setErrorMessage('Mật khẩu và xác nhận mật khẩu không khớp.');
+      toast.error('Mật khẩu và xác nhận mật khẩu không khớp.', { position: 'top-right' });
       return;
     }
 
@@ -37,12 +59,9 @@ function SignupForm() {
           password_confirmation: confirmPassword,
           role,
         },
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
 
-      // Hiển thị toast thành công với nút chuyển trang
       toast.success(
         <div>
           Đăng ký thành công!<br />
@@ -71,22 +90,26 @@ function SignupForm() {
           pauseOnHover: true
         }
       );
-
-      console.log('Đăng ký thành công:', response.data);
     } catch (error) {
       console.error('Lỗi đăng ký:', error.response?.data || error.message);
 
       if (error.response?.data?.errors) {
         const errors = error.response.data.errors;
         const firstKey = Object.keys(errors)[0];
-        setErrorMessage(errors[firstKey][0]);
+        const message = errors[firstKey][0];
+
+        let vietnameseMessage = message;
+        if (message.includes('The email has already been taken')) {
+          vietnameseMessage = 'Email đã được đăng ký.';
+        } else if (message.includes('The username has already been taken')) {
+          vietnameseMessage = 'Tên người dùng đã tồn tại.';
+        }
+
+        toast.error(vietnameseMessage, { position: 'top-right' });
       } else if (error.response?.data?.message) {
-        setErrorMessage(error.response.data.message);
+        toast.error(error.response.data.message, { position: 'top-right' });
       } else {
-        toast.error('Đăng ký thất bại!', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
+        toast.error('Đăng ký thất bại!', { position: 'top-right' });
       }
     }
   };
@@ -97,15 +120,14 @@ function SignupForm() {
         <h3>Đăng Ký</h3>
       </div>
 
-      {errorMessage && <div className="alert alert-danger">{errorMessage}</div>}
-
       <form onSubmit={handleSignUp}>
         <div className="mb-3">
-          <label htmlFor="username" className="form-label">Nhập tên Người Dùng</label>
+          <label htmlFor="username" className="form-label">Tên người dùng</label>
           <input
             type="text"
             className="form-control"
             id="username"
+            maxLength={50}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -113,11 +135,12 @@ function SignupForm() {
         </div>
 
         <div className="mb-3">
-          <label htmlFor="email" className="form-label">Email address</label>
+          <label htmlFor="email" className="form-label">Email</label>
           <input
             type="email"
             className="form-control"
             id="email"
+            maxLength={100}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -125,11 +148,12 @@ function SignupForm() {
         </div>
 
         <div className="mb-3">
-          <label htmlFor="password" className="form-label">Password</label>
+          <label htmlFor="password" className="form-label">Mật khẩu</label>
           <input
             type="password"
             className="form-control"
             id="password"
+            maxLength={100}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -137,11 +161,12 @@ function SignupForm() {
         </div>
 
         <div className="mb-3">
-          <label htmlFor="confirmPassword" className="form-label">Nhập lại Password</label>
+          <label htmlFor="confirmPassword" className="form-label">Nhập lại mật khẩu</label>
           <input
             type="password"
             className="form-control"
             id="confirmPassword"
+            maxLength={100}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
@@ -149,7 +174,7 @@ function SignupForm() {
         </div>
 
         <div className="mb-3">
-          <label htmlFor="role" className="form-label">Chọn vai trò</label>
+          <label htmlFor="role" className="form-label">Vai trò</label>
           <select
             className="form-select"
             id="role"
@@ -158,7 +183,7 @@ function SignupForm() {
             required
           >
             <option value="">-- Chọn vai trò --</option>
-            <option value="user">Người dùng</option>
+            <option value="member">Người dùng</option>
             <option value="admin">Quản trị viên</option>
           </select>
         </div>

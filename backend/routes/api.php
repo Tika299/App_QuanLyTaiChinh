@@ -16,10 +16,10 @@ use App\Http\Controllers\Api\FinanceController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()->load('roles:id,name');
 });
+
 
 
 

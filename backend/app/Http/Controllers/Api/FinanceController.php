@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -7,6 +6,7 @@ use App\Models\Transaction;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class FinanceController extends Controller
 {
@@ -16,23 +16,24 @@ class FinanceController extends Controller
         $user = $request->user();
 
         // Xác định định dạng thời gian
-        if ($type === 'year') {
-            $dateFormat = '%Y';
-        } elseif ($type === 'week') {
-            $dateFormat = '%x-W%v'; // ISO week: "2025-W18"
-        } else {
-            $dateFormat = '%m/%Y'; // "05/2025"
-        }
+        $dateFormat = match ($type) {
+            'year' => '%Y',
+            'week' => '%Y-W%V', // ISO week format: "2025-W01"
+            'month' => '%m/%Y', // "01/2025"
+            default => '%m/%Y',
+        };
 
         // Lấy thu nhập và chi tiêu theo thời gian
-        $transactions = Transaction::select(
+        $query = Transaction::select(
             DB::raw("DATE_FORMAT(transactions.created_at, '$dateFormat') as period"),
             DB::raw("SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as income"),
             DB::raw("SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as expenses")
         )
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
-            ->where('categories.user_id', $user->id)
+            ->where('categories.user_id', $user->id);
+
+        $transactions = $query
             ->groupBy('period')
             ->orderBy('period')
             ->get();
@@ -42,7 +43,7 @@ class FinanceController extends Controller
         $expenses = $transactions->pluck('expenses')->map(fn($val) => (float) $val)->toArray();
 
         // Lấy danh mục chi tiêu
-        $categories = Transaction::select(
+        $categoriesQuery = Transaction::select(
             'categories.name',
             'categories.color',
             DB::raw('SUM(transactions.amount) as value'),
@@ -52,7 +53,9 @@ class FinanceController extends Controller
             ->where('transactions.user_id', $user->id)
             ->where('categories.user_id', $user->id)
             ->where('categories.type', 'expense')
-            ->groupBy('categories.id', 'categories.name', 'categories.color')
+            ->groupBy('categories.id', 'categories.name', 'categories.color');
+
+        $categories = $categoriesQuery
             ->get()
             ->map(fn($cat) => [
                 'name' => $cat->name,
@@ -63,7 +66,7 @@ class FinanceController extends Controller
             ->toArray();
 
         // Lấy lịch sử giao dịch
-        $transactionsHistory = Transaction::select(
+        $transactionsHistoryQuery = Transaction::select(
             DB::raw("DATE_FORMAT(transactions.created_at, '%Y-%m-%d') as date"),
             'categories.type as type',
             'categories.name as category',
@@ -74,7 +77,9 @@ class FinanceController extends Controller
             ->where('transactions.user_id', $user->id)
             ->where('categories.user_id', $user->id)
             ->orderBy('transactions.created_at', 'desc')
-            ->take(10)
+            ->take(50); // Giới hạn 50 giao dịch để tránh lag
+
+        $transactionsHistory = $transactionsHistoryQuery
             ->get()
             ->map(fn($t) => [
                 'date' => $t->date,
@@ -105,6 +110,10 @@ class FinanceController extends Controller
             return response()->json(['message' => 'Vui lòng chọn cả hai khoảng thời gian'], 422);
         }
 
+        if ($period1 === $period2) {
+            return response()->json(['message' => 'Vui lòng chọn hai khoảng thời gian khác nhau'], 422);
+        }
+
         $periods = [
             'period1' => $period1,
             'period2' => $period2,
@@ -118,21 +127,32 @@ class FinanceController extends Controller
                 ->where('categories.user_id', $user->id);
 
             if ($type === 'month') {
+                if (!preg_match('/^\d{4}-\d{2}$/', $period)) {
+                    return response()->json(['message' => 'Định dạng tháng không hợp lệ. Kỳ vọng: YYYY-MM'], 422);
+                }
                 [$year, $month] = explode('-', $period);
+                $month = (int) $month;
                 $query->whereYear('transactions.created_at', $year)
-                    ->whereMonth('transactions.created_at', $month);
+                      ->whereMonth('transactions.created_at', $month);
 
-                // Gán nhãn đẹp hơn
-                $monthLabel = now()->setMonth((int) $month)->translatedFormat('F'); // Ví dụ: Tháng 5 -> "May"
-                $label = "$monthLabel $year"; // VD: "May 2025"
+                $monthLabel = Carbon::createFromFormat('m', $month)->translatedFormat('F');
+                $label = "$monthLabel $year";
             } elseif ($type === 'week') {
+                if (!preg_match('/^\d{4}-W\d{2}$/', $period)) {
+                    return response()->json(['message' => 'Định dạng tuần không hợp lệ. Kỳ vọng: YYYY-WWW'], 422);
+                }
                 [$year, $weekStr] = explode('-W', $period);
                 $week = (int) $weekStr;
-
                 $query->whereYear('transactions.created_at', $year)
-                    ->whereRaw('WEEK(transactions.created_at, 1) = ?', [$week]);
+                      ->whereRaw('WEEK(transactions.created_at, 1) = ?', [$week - 1]); // WEEK bắt đầu từ 0
 
                 $label = "Tuần $week ($year)";
+            } elseif ($type === 'year') {
+                if (!preg_match('/^\d{4}$/', $period)) {
+                    return response()->json(['message' => 'Định dạng năm không hợp lệ. Kỳ vọng: YYYY'], 422);
+                }
+                $query->whereYear('transactions.created_at', $period);
+                $label = "Năm $period";
             } else {
                 return response()->json(['message' => 'Loại thống kê không hợp lệ'], 422);
             }
@@ -153,5 +173,4 @@ class FinanceController extends Controller
 
         return response()->json($result);
     }
-
 }
