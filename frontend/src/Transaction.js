@@ -14,6 +14,18 @@ function Transaction() {
     const [locDanhMuc, setLocDanhMuc] = useState('Tất cả');
     const [locNgay, setLocNgay] = useState('');
     const [showModal, setShowModal] = useState(false);
+    const [showModalEdit, setShowModalEdit] = useState(false);
+    const [showModalDetail, setShowModalDetail] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [categories, setCategories] = useState([]);
+    const [formDataEdit, setFormDataEdit] = useState({
+        id: null,
+        ten: '',
+        soTien: '',
+        category_id: '',
+        ngay: '',
+        moTa: '',
+    });
     const [formData, setFormData] = useState({
         ten: '',
         soTien: '',
@@ -24,6 +36,49 @@ function Transaction() {
     const [loi, setLoi] = useState('');
 
     const danhMuc = ['Tất cả', 'Thu nhập', 'Chi tiêu'];
+
+
+    // Lấy danh sách danh mục
+    const fetchCategories = async () => {
+        try {
+            const response = await axios.get(`http://localhost/api/categories`);
+            setCategories(response.data);
+        } catch (error) {
+            console.error('Lỗi khi lấy danh mục:', error);
+            setLoi('Không thể tải danh sách danh mục');
+        }
+    };
+
+    // Lấy danh sách giao dịch
+    const fetchTransactions = async () => {
+        try {
+            const params = {};
+            if (locDanhMuc !== 'Tất cả') {
+                params.danhMuc = locDanhMuc;
+            }
+            if (locNgay !== '') {
+                params.ngay = locNgay;
+            }
+
+            const response = await axios.get(`http://localhost/api/transactions`, {
+                params,
+            });
+            // Đảm bảo dữ liệu trả về có category_color
+            setGiaoDich(response.data.map(item => ({
+                ...item,
+                category_color: item.category_color || '#000000', // Mặc định đen nếu không có màu
+            })));
+        } catch (error) {
+            console.error('Lỗi khi lấy giao dịch:', error);
+            setLoi(error.response?.data?.error || 'Không thể tải danh sách giao dịch');
+        }
+    };
+
+    // Gọi API khi component mount
+    useEffect(() => {
+        fetchCategories();
+        fetchTransactions();
+    }, [locDanhMuc, locNgay]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -88,6 +143,12 @@ function Transaction() {
         setLoi('');
     };
 
+    const handleCloseModalDetail = () => {
+        setShowModalDetail(false);
+        setSelectedTransaction(null);
+        setLoi('');
+    };
+
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         if (name === 'locDanhMuc') setLocDanhMuc(value);
@@ -106,6 +167,27 @@ function Transaction() {
 
     const xuLyXemChiTiet = (id) => {
         alert(`Chuyển đến trang Chi tiết Giao dịch cho ID: ${id}`);
+    const xuLyXemChiTiet = async (id) => {
+        try {
+            // Tìm giao dịch trong danh sách giaoDich
+            const existingTransaction = giaoDich.find((gd) => gd.id === id);
+            if (existingTransaction) {
+                setSelectedTransaction(existingTransaction);
+                setShowModalDetail(true);
+            } else {
+                // Nếu không tìm thấy, gọi API
+                const response = await axios.get(`http://localhost/api/transactions/${id}`);
+                setSelectedTransaction({
+                    ...response.data,
+                    category_name: response.data.category_name || 'Không xác định',
+                    category_color: response.data.category_color || '#000000',
+                    danhMelderly: response.data.danhMelderly || 'Không xác định',
+                });
+                setShowModalDetail(true);
+            }
+        } catch (error) {
+            setLoi(error.response?.data?.error || 'Lỗi khi xem chi tiết giao dịch');
+        }
     };
 
     const giaoDichDaLoc = giaoDich.filter((gd) => {
@@ -190,6 +272,19 @@ function Transaction() {
                                                                 {Math.abs(giaoDich.soTien).toLocaleString('vi-VN')} VNĐ
                                                             </td>
                                                             <td>{giaoDich.danhMuc}</td>
+                                                            <td>
+                                                                <span
+                                                                    style={{
+                                                                        backgroundColor: giaoDich.category_color,
+                                                                        color: '#fff',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                    }}
+                                                                >
+                                                                    {giaoDich.category_name}
+                                                                </span>
+                                                            </td>
+                                                            <td>{giaoDich.danhMelderly}</td>
                                                             <td>{giaoDich.ngay}</td>
                                                             <td>
                                                                 <button
@@ -314,6 +409,172 @@ function Transaction() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Modal Sửa Giao Dịch */}
+                                <div className={`modal fade ${showModalEdit ? 'show d-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                    <div className="modal-dialog modal-dialog-centered">
+                                        <div className="modal-content">
+                                            <div className="modal-header">
+                                                <h5 className="modal-title">Sửa Giao dịch</h5>
+                                                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                                            </div>
+                                            <div className="modal-body">
+                                                <form onSubmit={handleSubmit}>
+                                                    {loi && (
+                                                        <div className="alert alert-danger" role="alert">
+                                                            {loi}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="ten" className="form-label">Tên giao dịch</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            id="ten"
+                                                            name="ten"
+                                                            value={formDataEdit.ten}
+                                                            onChange={handleChange}
+                                                            placeholder="Ví dụ: Mua thực phẩm"
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="soTien" className="form-label">Số tiền (VNĐ)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            id="soTien"
+                                                            name="soTien"
+                                                            value={formDataEdit.soTien}
+                                                            onChange={handleChange}
+                                                            placeholder="Nhập số tiền"
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="category_id" className="form-label">Danh mục</label>
+                                                        <select
+                                                            className="form-select"
+                                                            id="category_id"
+                                                            name="category_id"
+                                                            value={formDataEdit.category_id}
+                                                            onChange={handleChange}
+                                                        >
+                                                            <option value="">Chọn danh mục</option>
+                                                            {categories.map((cat) => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.name} ({cat.type})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="ngay" className="form-label">Ngày giao dịch</label>
+                                                        <input
+                                                            type="date"
+                                                            className="form-control"
+                                                            id="ngay"
+                                                            name="ngay"
+                                                            value={formDataEdit.ngay}
+                                                            onChange={handleChange}
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label htmlFor="moTa" className="form-label">Mô tả (Tùy chọn)</label>
+                                                        <textarea
+                                                            className="form-control"
+                                                            id="moTa"
+                                                            name="moTa"
+                                                            value={formDataEdit.moTa}
+                                                            onChange={handleChange}
+                                                            placeholder="Nhập mô tả giao dịch"
+                                                            rows="4"
+                                                        ></textarea>
+                                                    </div>
+
+                                                    <div className="d-flex gap-2">
+                                                        <button type="submit" className="btn btn-primary">Cập nhật</button>
+                                                        <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                                                            Hủy
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Modal Xem Chi Tiết Giao Dịch */}
+                                <div className={`modal fade ${showModalDetail ? 'show d-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                    <div className="modal-dialog modal-dialog-centered">
+                                        <div className="modal-content">
+                                            <div className="modal-header">
+                                                <h5 className="modal-title">Chi Tiết Giao Dịch</h5>
+                                                <button type="button" className="btn-close" onClick={handleCloseModalDetail}></button>
+                                            </div>
+                                            <div className="modal-body">
+                                                {loi && (
+                                                    <div className="alert alert-danger" role="alert">
+                                                        {loi}
+                                                    </div>
+                                                )}
+                                                {selectedTransaction && (
+                                                    <div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Tên giao dịch</label>
+                                                            <p>{selectedTransaction.ten}</p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Số tiền (VNĐ)</label>
+                                                            <p className={selectedTransaction.danhMelderly === "Thu nhập" ? 'text-success' : 'text-danger'}>
+                                                                {Math.abs(selectedTransaction.soTien).toLocaleString('vi-VN')} VNĐ
+                                                            </p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Danh mục</label>
+                                                            <p>
+                                                                <span
+                                                                    style={{
+                                                                        backgroundColor: selectedTransaction.category_color,
+                                                                        color: '#fff',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                    }}
+                                                                >
+                                                                    {selectedTransaction.category_name}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Loại</label>
+                                                            <p>{selectedTransaction.danhMelderly}</p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Ngày giao dịch</label>
+                                                            <p>{selectedTransaction.ngay}</p>
+                                                        </div>
+                                                        <div className="mb-3">
+                                                            <label className="form-label fw-bold">Mô tả</label>
+                                                            <p>{selectedTransaction.moTa || 'Không có mô tả'}</p>
+                                                        </div>
+                                                        <div className="d-flex justify-content-end">
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary"
+                                                                onClick={handleCloseModalDetail}
+                                                            >
+                                                                Đóng
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -321,6 +582,7 @@ function Transaction() {
             </div>
         </div>
     )
+}
 }
 
 export default Transaction;

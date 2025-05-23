@@ -12,6 +12,10 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable(); // Có thể null
             $table->string('name');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('name', 225);
+            $table->string('color', 50);
+            $table->enum('type', ['income', 'expense']);
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
