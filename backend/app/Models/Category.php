@@ -14,12 +14,9 @@ class Category extends Model
     protected $fillable = [
         'user_id',
         'name',
-        'color',
-        'type',
     ];
 
     protected $casts = [
-        'type' => 'string',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -27,10 +24,5 @@ class Category extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function transactions()
-    {
-        return $this->hasMany(Transaction::class);
     }
 }

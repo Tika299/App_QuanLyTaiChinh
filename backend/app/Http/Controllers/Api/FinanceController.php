@@ -7,53 +7,70 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class FinanceController extends Controller
 {
+    /**
+     * Danh sách các danh mục thu nhập
+     */
+    private $incomeCategories = ['Lương', 'Thưởng', 'Thu nhập khác'];
+
+    /**
+     * Lấy thống kê tài chính theo khoảng thời gian
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getFinance(Request $request)
     {
-        $type = $request->query('type', 'month');
         $user = $request->user();
+        $type = $request->query('type', 'month');
 
-        // Xác định định dạng thời gian
+        // Định dạng thời gian dựa trên type
         $dateFormat = match ($type) {
             'year' => '%Y',
-            'week' => '%Y-W%V', // ISO week format: "2025-W01"
-            'month' => '%m/%Y', // "01/2025"
-            default => '%m/%Y',
+            'week' => '%Y-W%V',
+            'month' => '%Y-%m',
+            default => '%Y-%m',
         };
 
-        // Lấy thu nhập và chi tiêu theo thời gian
+        // Query thống kê thu nhập và chi tiêu
         $query = Transaction::select(
             DB::raw("DATE_FORMAT(transactions.created_at, '$dateFormat') as period"),
-            DB::raw("SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as income"),
-            DB::raw("SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as expenses")
+            DB::raw("SUM(CASE WHEN categories.name IN ('" . implode("','", $this->incomeCategories) . "') THEN transactions.amount ELSE 0 END) as income"),
+            DB::raw("SUM(CASE WHEN categories.name NOT IN ('" . implode("','", $this->incomeCategories) . "') THEN transactions.amount ELSE 0 END) as expenses")
         )
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
-            ->where('categories.user_id', $user->id);
+            ->where(function ($query) use ($user) {
+                $query->where('categories.user_id', $user->id)
+                      ->orWhereNull('categories.user_id');
+            });
 
         $transactions = $query
             ->groupBy('period')
-            ->orderBy('period')
+            ->orderBy('period', 'desc')
             ->get();
 
         $labels = $transactions->pluck('period')->toArray();
         $income = $transactions->pluck('income')->map(fn($val) => (float) $val)->toArray();
         $expenses = $transactions->pluck('expenses')->map(fn($val) => (float) $val)->toArray();
 
-        // Lấy danh mục chi tiêu
+        // Query danh mục chi tiêu
         $categoriesQuery = Transaction::select(
             'categories.name',
-            'categories.color',
             DB::raw('SUM(transactions.amount) as value'),
             DB::raw('ROUND(SUM(transactions.amount) / SUM(SUM(transactions.amount)) OVER() * 100, 2) as percent')
         )
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
-            ->where('categories.user_id', $user->id)
-            ->where('categories.type', 'expense')
-            ->groupBy('categories.id', 'categories.name', 'categories.color');
+            ->where(function ($query) use ($user) {
+                $query->where('categories.user_id', $user->id)
+                      ->orWhereNull('categories.user_id');
+            })
+            ->whereNotIn('categories.name', $this->incomeCategories)
+            ->groupBy('categories.id', 'categories.name');
 
         $categories = $categoriesQuery
             ->get()
@@ -61,32 +78,33 @@ class FinanceController extends Controller
                 'name' => $cat->name,
                 'value' => (float) $cat->value,
                 'percent' => (float) $cat->percent,
-                'color' => $cat->color,
             ])
             ->toArray();
 
-        // Lấy lịch sử giao dịch
+        // Query lịch sử giao dịch
         $transactionsHistoryQuery = Transaction::select(
             DB::raw("DATE_FORMAT(transactions.created_at, '%Y-%m-%d') as date"),
-            'categories.type as type',
             'categories.name as category',
             'transactions.amount',
             'transactions.description'
         )
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $user->id)
-            ->where('categories.user_id', $user->id)
+            ->where(function ($query) use ($user) {
+                $query->where('categories.user_id', $user->id)
+                      ->orWhereNull('categories.user_id');
+            })
             ->orderBy('transactions.created_at', 'desc')
-            ->take(50); // Giới hạn 50 giao dịch để tránh lag
+            ->take(50);
 
         $transactionsHistory = $transactionsHistoryQuery
             ->get()
             ->map(fn($t) => [
                 'date' => $t->date,
-                'type' => $t->type === 'income' ? 'Thu' : 'Chi',
+                'type' => in_array($t->category, $this->incomeCategories) ? 'Thu' : 'Chi',
                 'category' => $t->category,
                 'amount' => (float) $t->amount,
-                'description' => $t->description,
+                'description' => $t->description ?: '',
             ])
             ->toArray();
 
@@ -96,22 +114,34 @@ class FinanceController extends Controller
             'expenses' => $expenses,
             'categories' => $categories,
             'transactions' => $transactionsHistory,
-        ]);
+        ], 200);
     }
 
+    /**
+     * So sánh tài chính giữa hai khoảng thời gian
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function compareFinance(Request $request)
     {
+        $user = $request->user();
         $type = $request->query('type', 'month');
         $period1 = $request->query('period1');
         $period2 = $request->query('period2');
-        $user = $request->user();
 
-        if (!$period1 || !$period2) {
-            return response()->json(['message' => 'Vui lòng chọn cả hai khoảng thời gian'], 422);
-        }
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'period1' => 'required|string',
+            'period2' => 'required|string|different:period1',
+        ], [
+            'period1.required' => 'Vui lòng chọn khoảng thời gian thứ nhất.',
+            'period2.required' => 'Vui lòng chọn khoảng thời gian thứ hai.',
+            'period2.different' => 'Vui lòng chọn hai khoảng thời gian khác nhau.',
+        ]);
 
-        if ($period1 === $period2) {
-            return response()->json(['message' => 'Vui lòng chọn hai khoảng thời gian khác nhau'], 422);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
         $periods = [
@@ -124,7 +154,10 @@ class FinanceController extends Controller
         foreach ($periods as $key => $period) {
             $query = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('transactions.user_id', $user->id)
-                ->where('categories.user_id', $user->id);
+                ->where(function ($query) use ($user) {
+                    $query->where('categories.user_id', $user->id)
+                          ->orWhereNull('categories.user_id');
+                });
 
             if ($type === 'month') {
                 if (!preg_match('/^\d{4}-\d{2}$/', $period)) {
@@ -144,7 +177,7 @@ class FinanceController extends Controller
                 [$year, $weekStr] = explode('-W', $period);
                 $week = (int) $weekStr;
                 $query->whereYear('transactions.created_at', $year)
-                      ->whereRaw('WEEK(transactions.created_at, 1) = ?', [$week - 1]); // WEEK bắt đầu từ 0
+                      ->whereRaw('WEEK(transactions.created_at, 1) = ?', [$week - 1]);
 
                 $label = "Tuần $week ($year)";
             } elseif ($type === 'year') {
@@ -159,8 +192,8 @@ class FinanceController extends Controller
 
             $data = $query
                 ->select(
-                    DB::raw("SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as income"),
-                    DB::raw("SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as expenses")
+                    DB::raw("SUM(CASE WHEN categories.name IN ('" . implode("','", $this->incomeCategories) . "') THEN transactions.amount ELSE 0 END) as income"),
+                    DB::raw("SUM(CASE WHEN categories.name NOT IN ('" . implode("','", $this->incomeCategories) . "') THEN transactions.amount ELSE 0 END) as expenses")
                 )
                 ->first();
 
@@ -171,6 +204,6 @@ class FinanceController extends Controller
             ];
         }
 
-        return response()->json($result);
+        return response()->json($result, 200);
     }
 }
