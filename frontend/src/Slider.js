@@ -85,7 +85,7 @@ function Slider() {
                     </Link>
                 </li>
                 <li>
-                    <Link to="/orders" className={isActive("/orders")}>
+                    <Link to="/transactions" className={isActive("/transactions")}>
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#table" />
                         </svg>
@@ -93,7 +93,7 @@ function Slider() {
                     </Link>
                 </li>
                 <li>
-                    <Link to="/products" className={isActive("/products")}>
+                    <Link to="/goals" className={isActive("/goals")}>
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#grid" />
                         </svg>
@@ -101,7 +101,7 @@ function Slider() {
                     </Link>
                 </li>
                 <li>
-                    <Link to="/customers" className={isActive("/customers")}>
+                    <Link to="/products" className={isActive("/products")}>
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#people-circle" />
                         </svg>

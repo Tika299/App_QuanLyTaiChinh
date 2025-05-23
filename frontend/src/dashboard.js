@@ -12,10 +12,14 @@ import {
   BarElement,
   ArcElement,
   Legend,
+  Filler, // Thêm Filler vào đây
 } from 'chart.js';
 import axios from 'axios';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Header from './Header';
 import Slider from './Slider';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // Register Chart.js components
 ChartJS.register(
@@ -28,7 +32,8 @@ ChartJS.register(
   Tooltip,
   BarElement,
   ArcElement,
-  Legend
+  Legend,
+  Filler // Đăng ký plugin Filler
 );
 
 // Animated number counter component
@@ -59,12 +64,14 @@ const AnimatedNumber = ({ value }) => {
 
 const Dashboard = () => {
   const [timeFrame, setTimeFrame] = useState('month');
+  const [selectedYear, setSelectedYear] = useState(null);
   const [financeData, setFinanceData] = useState({
     income: [],
     expenses: [],
     categories: [],
     transactions: [],
     labels: [],
+    period_options: [],
   });
   const [compareData, setCompareData] = useState(null);
   const [selectedPeriods, setSelectedPeriods] = useState({
@@ -72,29 +79,11 @@ const Dashboard = () => {
     period2: '',
     type: 'month',
   });
-  const [toasts, setToasts] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [periodOptions, setPeriodOptions] = useState({
-    month: [],
-    week: [],
-  });
-  const [selectedYear, setSelectedYear] = useState(null);
   const chartRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-
-  // Hàm thêm toast
-  const addToast = (message, type = 'danger') => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 5000);
-  };
-
-  // Hàm xóa toast
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Hàm lấy dữ liệu từ API
   const fetchFinanceData = async (frame, year = null) => {
@@ -105,92 +94,30 @@ const Dashboard = () => {
 
       const token = localStorage.getItem('token');
       if (!token) {
-        addToast('Vui lòng đăng nhập lại.');
-        window.location.href = '/';
+        toast.error('Vui lòng đăng nhập lại.');
+        navigate('/');
         return;
       }
 
+      const timestamp = new Date().getTime();
       const url = year
-        ? `http://127.0.0.1:8000/api/finance?type=${frame}&year=${year}`
-        : `http://127.0.0.1:8000/api/finance?type=${frame}`;
-
+        ? `http://127.0.0.1:8000/api/finance?type=${frame}&year=${year}&t=${timestamp}`
+        : `http://127.0.0.1:8000/api/finance?type=${frame}&t=${timestamp}`;
       const response = await axios.get(url, {
         withCredentials: true,
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
+        },
       });
 
-      let filteredData = response.data;
-      if (frame === 'year' && !year) {
-        const allowedYears = ['2024', '2025'];
-        filteredData = {
-          labels: response.data.labels.filter((label) =>
-            allowedYears.includes(label)
-          ),
-          income: response.data.income.slice(0, response.data.labels.length).filter((_, i) =>
-            allowedYears.includes(response.data.labels[i])
-          ),
-          expenses: response.data.expenses.slice(0, response.data.labels.length).filter((_, i) =>
-            allowedYears.includes(response.data.labels[i])
-          ),
-          categories: response.data.categories,
-          transactions: response.data.transactions.filter((t) =>
-            allowedYears.some((year) => t.date.startsWith(year))
-          ),
-        };
-      }
-
-      // Xử lý dữ liệu tuần, chỉ lấy các tuần có dữ liệu (tối đa 25 tuần)
-      if (frame === 'week') {
-        const weeks = [...new Set(response.data.labels)]
-          .filter((label) => {
-            if (year && !label.includes(year)) return false;
-            const [, weekNum] = label.split('-W');
-            const weekNumber = parseInt(weekNum, 10);
-            return weekNumber <= 25; // Chỉ lấy đến tuần 25
-          })
-          .map((label) => {
-            const [, weekNum] = label.split('-W');
-            const weekNumber = parseInt(weekNum, 10);
-            return {
-              value: label,
-              label: `Tuần ${weekNumber} (${label.split('-W')[0]})`,
-              weekNum: weekNumber,
-              year: label.split('-W')[0],
-            };
-          })
-          .sort((a, b) => {
-            // Sắp xếp theo năm trước, sau đó theo tuần
-            if (a.year !== b.year) return a.year.localeCompare(b.year);
-            return a.weekNum - b.weekNum;
-          });
-
-        filteredData = {
-          ...response.data,
-          labels: weeks.map((w) => w.label),
-          income: weeks.map((w) => response.data.income[response.data.labels.indexOf(w.value)] || 0),
-          expenses: weeks.map((w) => response.data.expenses[response.data.labels.indexOf(w.value)] || 0),
-        };
-
-        setPeriodOptions((prev) => ({ ...prev, week: weeks }));
-      } else if (frame === 'month') {
-        const months = [...new Set(response.data.labels)]
-          .filter((label) => (year ? label.includes(year) : true))
-          .map((label) => {
-            const [month, year] = label.split('/');
-            return {
-              value: `${year}-${month.padStart(2, '0')}`,
-              label: `Tháng ${parseInt(month)}/${year}`,
-            };
-          })
-          .sort((a, b) => a.value.localeCompare(b.value));
-        setPeriodOptions((prev) => ({ ...prev, month: months }));
-      }
-
-      setFinanceData(filteredData);
+      setFinanceData(response.data);
+      console.log('Finance Data:', response.data); // Debug dữ liệu
       setCurrentPage(1);
     } catch (err) {
-      addToast('Không thể tải dữ liệu tài chính: ' + (err.response?.data?.message || err.message));
-      setFinanceData({ income: [], expenses: [], categories: [], transactions: [], labels: [] });
+      toast.error('Không thể tải dữ liệu tài chính: ' + (err.response?.data?.message || err.message));
+      console.error('Fetch Finance Error:', err); // Debug lỗi
+      setFinanceData({ income: [], expenses: [], categories: [], transactions: [], labels: [], period_options: [] });
     }
   };
 
@@ -211,32 +138,34 @@ const Dashboard = () => {
     }
   };
 
-  // Tải dữ liệu ban đầu
+  // Lấy query parameter từ URL
   useEffect(() => {
-    const loadInitialData = async () => {
-      await fetchFinanceData('month');
-      await fetchFinanceData('week');
-      fetchFinanceData(timeFrame);
-    };
-    loadInitialData();
-  }, []);
+    const query = new URLSearchParams(location.search);
+    const shouldRefresh = query.get('refresh') === 'true';
 
-  // Tải dữ liệu khi timeFrame thay đổi
-  useEffect(() => {
-    if (!selectedYear) {
-      fetchFinanceData(timeFrame);
+    if (shouldRefresh) {
+      fetchFinanceData(timeFrame, selectedYear);
+      // Xóa query parameter sau khi làm mới
+      navigate('/dashboard', { replace: true });
+    } else {
+      fetchFinanceData(timeFrame, selectedYear);
     }
-  }, [timeFrame]);
+  }, [location.search, navigate]);
+
+  // Tải dữ liệu khi timeFrame hoặc selectedYear thay đổi
+  useEffect(() => {
+    fetchFinanceData(timeFrame, selectedYear);
+  }, [timeFrame, selectedYear]);
 
   // Hàm so sánh hai khoảng thời gian
   const comparePeriods = async () => {
     if (!selectedPeriods.period1 || !selectedPeriods.period2) {
-      addToast('Vui lòng chọn cả hai khoảng thời gian.');
+      toast.error('Vui lòng chọn cả hai khoảng thời gian.');
       return;
     }
 
     if (selectedPeriods.period1 === selectedPeriods.period2) {
-      addToast('Vui lòng chọn hai khoảng thời gian khác nhau.');
+      toast.error('Vui lòng chọn hai khoảng thời gian khác nhau.');
       return;
     }
 
@@ -247,64 +176,76 @@ const Dashboard = () => {
 
       const token = localStorage.getItem('token');
       if (!token) {
-        addToast('Vui lòng đăng nhập lại.');
-        window.location.href = '/';
+        toast.error('Vui lòng đăng nhập lại.');
+        navigate('/');
         return;
       }
 
+      const timestamp = new Date().getTime();
       const response = await axios.get(
-        `http://127.0.0.1:8000/api/finance/compare?type=${selectedPeriods.type}&period1=${selectedPeriods.period1}&period2=${selectedPeriods.period2}`,
+        `http://127.0.0.1:8000/api/finance/compare?type=${selectedPeriods.type}&period1=${selectedPeriods.period1}&period2=${selectedPeriods.period2}&t=${timestamp}`,
         {
           withCredentials: true,
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache',
+          },
         }
       );
 
-      if (
-        response.data &&
-        response.data.period1 &&
-        response.data.period2 &&
-        typeof response.data.period1.income === 'number' &&
-        typeof response.data.period1.expenses === 'number' &&
-        typeof response.data.period2.income === 'number' &&
-        typeof response.data.period2.expenses === 'number'
-      ) {
-        setCompareData(response.data);
-      } else {
-        addToast('Dữ liệu so sánh không hợp lệ.');
-      }
+      const periods = [
+        { ...response.data.period1, value: selectedPeriods.period1 },
+        { ...response.data.period2, value: selectedPeriods.period2 },
+      ].sort((a, b) => a.value.localeCompare(b.value));
+
+      setCompareData({
+        period1: periods[0],
+        period2: periods[1],
+      });
     } catch (err) {
       const errorMessage =
-        err.response?.data?.message.includes('Định dạng tuần không hợp lệ')
-          ? 'Không thể so sánh: Vui lòng chọn tuần hợp lệ (YYYY-WWW).'
-          : err.response?.data?.message.includes('Định dạng tháng không hợp lệ')
-          ? 'Không thể so sánh: Vui lòng chọn tháng hợp lệ (YYYY-MM).'
-          : err.response?.data?.message.includes('khác nhau')
-          ? 'Không thể so sánh: Vui lòng chọn hai khoảng thời gian khác nhau.'
-          : 'Không thể so sánh: ' + (err.response?.data?.message || err.message);
-      addToast(errorMessage);
+        err.response?.status === 422
+          ? 'Dữ liệu không hợp lệ: Vui lòng kiểm tra định dạng khoảng thời gian (YYYY-MM hoặc YYYY-WWW).'
+          : err.response?.data?.message.includes('Định dạng tuần không hợp lệ')
+            ? 'Không thể so sánh: Vui lòng chọn tuần hợp lệ (YYYY-WWW).'
+            : err.response?.data?.message.includes('Định dạng tháng không hợp lệ')
+              ? 'Không thể so sánh: Vui lòng chọn tháng hợp lệ (YYYY-MM).'
+              : err.response?.data?.message.includes('khác nhau')
+                ? 'Không thể so sánh: Vui lòng chọn hai khoảng thời gian khác nhau.'
+                : 'Không thể so sánh: ' + (err.response?.data?.message || err.message);
+      toast.error(errorMessage);
+      console.error('Compare API Error:', err.response?.data || err.message);
     }
   };
-
-  // Khởi tạo Bootstrap Toast
-  useEffect(() => {
-    const toastElements = document.querySelectorAll('.toast');
-    toastElements.forEach((toastEl) => {
-      const bootstrapToast = new window.bootstrap.Toast(toastEl);
-      bootstrapToast.show();
-    });
-  }, [toasts]);
 
   // Tổng quan tài chính
   const totalIncome = financeData.income.reduce((sum, val) => sum + val, 0);
   const totalExpenses = financeData.expenses.reduce((sum, val) => sum + val, 0);
   const balance = totalIncome - totalExpenses;
 
-  // Dữ liệu biểu đồ Line Chart
-  const getLabels = () => financeData.labels || [];
+  // Helper function to reformat week labels
+  const formatWeekLabel = (label) => {
+    if (label && label.includes('-W')) {
+      const [year, week] = label.split('-W');
+      const weekNumber = parseInt(week, 10);
+      return `Tuần ${weekNumber}-${year}`;
+    }
+    return label || '';
+  };
 
+  // Dữ liệu biểu đồ Line Chart
   const lineChartData = {
-    labels: getLabels(),
+    labels: financeData.labels
+      .map(formatWeekLabel)
+      .sort((a, b) => {
+        const aMatch = a.match(/Tuần (\d+)-(\d+)/);
+        const bMatch = b.match(/Tuần (\d+)-(\d+)/);
+        if (!aMatch || !bMatch) return 0;
+        const [aWeek, aYear] = aMatch.slice(1).map(Number);
+        const [bWeek, bYear] = bMatch.slice(1).map(Number);
+        return aYear - bYear || aWeek - bWeek;
+      })
+      .filter(label => label),
     datasets: [
       {
         label: 'Thu nhập',
@@ -313,7 +254,7 @@ const Dashboard = () => {
         backgroundColor: 'rgba(16, 185, 129, 0.4)',
         borderWidth: 4,
         tension: 0.4,
-        fill: true,
+        fill: true, // Sử dụng fill, cần plugin Filler
         pointBackgroundColor: 'rgba(255, 255, 255, 1)',
         pointBorderColor: 'rgba(16, 185, 129, 1)',
         pointBorderWidth: 3,
@@ -327,7 +268,7 @@ const Dashboard = () => {
         backgroundColor: 'rgba(239, 68, 68, 0.4)',
         borderWidth: 4,
         tension: 0.4,
-        fill: true,
+        fill: true, // Sử dụng fill, cần plugin Filler
         pointBackgroundColor: 'rgba(255, 255, 255, 1)',
         pointBorderColor: 'rgba(239, 68, 68, 1)',
         pointBorderWidth: 3,
@@ -337,10 +278,10 @@ const Dashboard = () => {
     ],
   };
 
-  // Xử lý danh mục để loại bỏ trùng lặp
+  // Dữ liệu biểu đồ Pie Chart
   const uniqueCategories = Object.values(
     financeData.categories.reduce((acc, category) => {
-      if (category && category.name) {
+      if (category && category.name && typeof category.value === 'number') {
         if (acc[category.name]) {
           acc[category.name].value += category.value;
         } else {
@@ -349,9 +290,10 @@ const Dashboard = () => {
       }
       return acc;
     }, {})
-  );
+  )
+    .filter(cat => cat.value > 0)
+    .sort((a, b) => b.value - a.value);
 
-  // Dữ liệu biểu đồ Pie Chart (danh mục)
   const pieChartData = {
     labels: uniqueCategories.map((cat) => cat.name),
     datasets: [
@@ -392,27 +334,17 @@ const Dashboard = () => {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          padding: 20,
-          usePointStyle: true,
-          pointStyle: 'circle',
-          color: '#333',
-        },
-      },
+      legend: { position: 'top', labels: { font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' }, color: '#333' } },
       title: {
         display: true,
         text: selectedYear
           ? `Thu nhập & Chi tiêu ${timeFrame === 'week' ? 'Hàng tuần' : 'Hàng tháng'} năm ${selectedYear}`
           : timeFrame === 'week'
-          ? 'Thu nhập & Chi tiêu Hàng tuần'
-          : timeFrame === 'year'
-          ? 'Thu nhập & Chi tiêu Hàng năm'
-          : 'Thu nhập & Chi tiêu Hàng tháng',
+            ? 'Thu nhập & Chi tiêu Hàng tuần'
+            : timeFrame === 'year'
+              ? 'Thu nhập & Chi tiêu Hàng năm'
+              : 'Thu nhập & Chi tiêu Hàng tháng',
         font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' },
-        padding: { top: 10, bottom: 20 },
         color: '#1a1a1a',
       },
       tooltip: {
@@ -420,93 +352,28 @@ const Dashboard = () => {
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
         titleFont: { size: 14, family: 'Helvetica, sans-serif', weight: 'bold' },
         bodyFont: { size: 12, family: 'Helvetica, sans-serif' },
-        padding: 12,
-        cornerRadius: 10,
-        boxPadding: 8,
-        callbacks: {
-          label: (context) => `${context.dataset.label}: ${context.parsed.y}₫`,
-        },
+        callbacks: { label: (context) => `${context.dataset.label}: ${context.parsed.y}₫` },
       },
     },
     scales: {
-      y: {
-        beginAtZero: true,
-        grid: { color: 'rgba(0, 0, 0, 0.05)', borderDash: [5, 5], drawBorder: false },
-        ticks: {
-          font: { size: 12, family: 'Helvetica, sans-serif' },
-          color: '#555',
-          padding: 10,
-          callback: (value) => `${value}₫`,
-        },
-        title: {
-          display: true,
-          text: 'Số tiền (₫)',
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          color: '#333',
-          padding: 10,
-        },
-      },
-      x: {
-        grid: { display: false },
-        ticks: {
-          font: { size: 12, family: 'Helvetica, sans-serif' },
-          color: '#555',
-          padding: 10,
-          callback: (value, index) => {
-            const label = financeData.labels[index];
-            if (timeFrame === 'week') {
-              const weekNum = label.match(/Tuần (\d+)/)?.[1];
-              return weekNum ? `W${weekNum}` : label;
-            }
-            return label;
-          },
-        },
-        title: {
-          display: true,
-          text: timeFrame === 'week' ? 'Tuần' : timeFrame === 'year' ? 'Năm' : 'Tháng',
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          color: '#333',
-          padding: 10,
-        },
-      },
+      y: { beginAtZero: true, ticks: { callback: (value) => `${value}₫` } },
+      x: { grid: { display: false } },
     },
-    interaction: { mode: 'nearest', intersect: false, axis: 'x' },
-    animation: { duration: 1500, easing: 'easeInOutQuart' },
   };
 
   const pieChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'right',
-        labels: {
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          padding: 20,
-          usePointStyle: true,
-          pointStyle: 'circle',
-          color: '#333',
-        },
-      },
-      title: {
-        display: true,
-        text: 'Phân loại chi tiêu',
-        font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' },
-        padding: { top: 10, bottom: 20 },
-        color: '#1a1a1a',
-      },
+      legend: { position: 'right', labels: { font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' }, color: '#333' } },
+      title: { display: true, text: 'Phân loại chi tiêu', font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' }, color: '#1a1a1a' },
       tooltip: {
         enabled: true,
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        titleFont: { size: 14, family: 'Helvetica, sans-serif', weight: 'bold' },
-        bodyFont: { size: 12, family: 'Helvetica, sans-serif' },
-        padding: 12,
-        cornerRadius: 10,
-        boxPadding: 8,
         callbacks: {
           label: (context) =>
             `${context.label}: ${context.parsed}₫ (${(
-              (context.parsed / context.dataset.data.reduce((a, b) => a + b, 0)) * 100
+              (context.parsed / (context.dataset.data.reduce((a, b) => a + b, 0) || 1)) * 100
             ).toFixed(2)}%)`,
         },
       },
@@ -517,71 +384,14 @@ const Dashboard = () => {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          padding: 20,
-          usePointStyle: true,
-          pointStyle: 'circle',
-          color: '#333',
-        },
-      },
-      title: {
-        display: true,
-        text: `So sánh ${selectedPeriods.type === 'month' ? 'Tháng' : 'Tuần'}`,
-        font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' },
-        padding: { top: 10, bottom: 20 },
-        color: '#1a1a1a',
-      },
-      tooltip: {
-        enabled: true,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        titleFont: { size: 14, family: 'Helvetica, sans-serif', weight: 'bold' },
-        bodyFont: { size: 12, family: 'Helvetica, sans-serif' },
-        padding: 12,
-        cornerRadius: 10,
-        boxPadding: 8,
-        callbacks: {
-          label: (context) => `${context.dataset.label}: ${context.parsed.y}₫`,
-        },
-      },
+      legend: { position: 'top', labels: { font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' }, color: '#333' } },
+      title: { display: true, text: `So sánh ${selectedPeriods.type === 'month' ? 'Tháng' : 'Tuần'}`, font: { size: 22, family: 'Helvetica, sans-serif', weight: '700' }, color: '#1a1a1a' },
+      tooltip: { enabled: true, backgroundColor: 'rgba(0, 0, 0, 0.85)', callbacks: { label: (context) => `${context.dataset.label}: ${context.parsed.y}₫` } },
     },
     scales: {
-      y: {
-        beginAtZero: true,
-        grid: { color: 'rgba(0, 0, 0, 0.05)', borderDash: [5, 5], drawBorder: false },
-        ticks: {
-          font: { size: 12, family: 'Helvetica, sans-serif' },
-          color: '#555',
-          padding: 10,
-          callback: (value) => `${value}₫`,
-        },
-        title: {
-          display: true,
-          text: 'Số tiền (₫)',
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          color: '#333',
-          padding: 10,
-        },
-      },
-      x: {
-        grid: { display: false },
-        ticks: {
-          font: { size: 12, family: 'Helvetica, sans-serif' },
-          color: '#555',
-          padding: 10,
-        },
-        title: {
-          display: true,
-          text: selectedPeriods.type === 'month' ? 'Tháng' : 'Tuần',
-          font: { size: 14, family: 'Helvetica, sans-serif', weight: '600' },
-          color: '#333',
-          padding: 10,
-        },
-      },
+      y: { beginAtZero: true, ticks: { callback: (value) => `${value}₫` } },
+      x: { grid: { display: false } },
     },
-    animation: { duration: 1500, easing: 'easeInOutQuart' },
   };
 
   // Phân trang cho lịch sử giao dịch
@@ -592,55 +402,19 @@ const Dashboard = () => {
   const paginatedTransactions = financeData.transactions.slice(startIndex, endIndex);
 
   const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>
-      {/* Sidebar */}
       <div style={{ width: '245px', backgroundColor: '#f8f9fa' }}>
         <Slider />
       </div>
-
-      {/* Main content */}
       <div className="flex-grow-1">
         <Header />
         <div className="p-4">
-          {/* Toast Container */}
-          <div
-            className="toast-container position-fixed top-0 end-0 p-3"
-            style={{ zIndex: 1050 }}
-          >
-            {toasts.map((toast) => (
-              <div
-                key={toast.id}
-                className={`toast bg-${toast.type} text-white`}
-                role="alert"
-                aria-live="assertive"
-                aria-atomic="true"
-                data-bs-autohide="true"
-                data-bs-delay="5000"
-              >
-                <div className="toast-header">
-                  <strong className="me-auto">Thông báo</strong>
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    data-bs-dismiss="toast"
-                    aria-label="Close"
-                    onClick={() => removeToast(toast.id)}
-                  ></button>
-                </div>
-                <div className="toast-body">{toast.message}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Chart and Summary Row */}
+          <ToastContainer position="top-right" autoClose={3000} />
           <div className="row g-4 mb-4">
-            {/* Chart */}
             <div className="col-md-8">
               <div className="card shadow-sm h-100 border-0">
                 <div className="card-body">
@@ -651,7 +425,8 @@ const Dashboard = () => {
                       value={timeFrame}
                       onChange={(e) => {
                         setTimeFrame(e.target.value);
-                        setSelectedYear(null);
+                        setSelectedPeriods({ ...selectedPeriods, period1: '', period2: '' });
+                        if (e.target.value !== 'year') setSelectedYear(null);
                       }}
                     >
                       <option value="week">Tuần</option>
@@ -660,109 +435,45 @@ const Dashboard = () => {
                     </select>
                   </div>
                   <div style={{ width: '100%', height: '400px' }}>
-                    <Line
-                      ref={chartRef}
-                      data={lineChartData}
-                      options={chartOptions}
-                      onClick={handleChartClick}
-                    />
+                    <Line ref={chartRef} data={lineChartData} options={chartOptions} onClick={handleChartClick} />
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Summary Card */}
             <div className="col-md-4">
               <div className="card shadow-sm h-100 border-0">
                 <div className="card-body">
                   <h4 className="card-title mb-4 text-dark">Tổng quan tài chính</h4>
                   <div className="d-flex flex-column gap-3">
-                    <div
-                      className="card bg-success text-white shadow-sm border-0"
-                      style={{
-                        transition: 'transform 0.2s, box-shadow 0.2s, border-color 0.2s',
-                        border: '2px solid transparent',
-                        borderRadius: '12px',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.02)';
-                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-                        e.currentTarget.style.borderColor = '#059669';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-                        e.currentTarget.style.borderColor = 'transparent';
-                      }}
-                    >
+                    <div className="card bg-success text-white shadow-sm border-0" style={{ transition: 'transform 0.2s', borderRadius: '12px' }} onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')} onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}>
                       <div className="card-body">
                         <div className="d-flex align-items-center">
                           <i className="fas fa-money-bill-wave me-3 fs-4"></i>
                           <div>
                             <h6 className="card-subtitle mb-2 text-white">Tổng thu nhập</h6>
-                            <h4 className="card-title mb-0 text-white">
-                              <AnimatedNumber value={totalIncome} />
-                            </h4>
+                            <h4 className="card-title mb-0 text-white"><AnimatedNumber value={totalIncome} /></h4>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div
-                      className="card bg-danger text-white shadow-sm border-0"
-                      style={{
-                        transition: 'transform 0.2s, box-shadow 0.2s, border-color 0.2s',
-                        border: '2px solid transparent',
-                        borderRadius: '12px',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.02)';
-                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-                        e.currentTarget.style.borderColor = '#dc2626';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-                        e.currentTarget.style.borderColor = 'transparent';
-                      }}
-                    >
+                    <div className="card bg-danger text-white shadow-sm border-0" style={{ transition: 'transform 0.2s', borderRadius: '12px' }} onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')} onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}>
                       <div className="card-body">
                         <div className="d-flex align-items-center">
                           <i className="fas fa-shopping-cart me-3 fs-4"></i>
                           <div>
                             <h6 className="card-subtitle mb-2 text-white">Tổng chi tiêu</h6>
-                            <h4 className="card-title mb-0 text-white">
-                              <AnimatedNumber value={totalExpenses} />
-                            </h4>
+                            <h4 className="card-title mb-0 text-white"><AnimatedNumber value={totalExpenses} /></h4>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div
-                      className="card bg-primary text-white shadow-sm border-0"
-                      style={{
-                        transition: 'transform 0.2s, box-shadow 0.2s, border-color 0.2s',
-                        border: '2px solid transparent',
-                        borderRadius: '12px',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.02)';
-                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-                        e.currentTarget.style.borderColor = '#2563eb';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-                        e.currentTarget.style.borderColor = 'transparent';
-                      }}
-                    >
+                    <div className="card bg-primary text-white shadow-sm border-0" style={{ transition: 'transform 0.2s', borderRadius: '12px' }} onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')} onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}>
                       <div className="card-body">
                         <div className="d-flex align-items-center">
                           <i className="fas fa-wallet me-3 fs-4"></i>
                           <div>
                             <h6 className="card-subtitle mb-2 text-white">Số dư</h6>
-                            <h4 className="card-title mb-0 text-white">
-                              <AnimatedNumber value={balance} />
-                            </h4>
+                            <h4 className="card-title mb-0 text-white"><AnimatedNumber value={balance} /></h4>
                           </div>
                         </div>
                       </div>
@@ -772,8 +483,6 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-
-          {/* Compare Periods */}
           <div className="card shadow-sm mb-4 border-0">
             <div className="card-body">
               <h4 className="card-title mb-4 text-dark">So sánh khoảng thời gian</h4>
@@ -783,9 +492,11 @@ const Dashboard = () => {
                   <select
                     className="form-select"
                     value={selectedPeriods.type}
-                    onChange={(e) =>
-                      setSelectedPeriods({ ...selectedPeriods, type: e.target.value, period1: '', period2: '' })
-                    }
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      setSelectedPeriods({ type: newType, period1: '', period2: '' });
+                      fetchFinanceData(newType);
+                    }}
                   >
                     <option value="month">Tháng</option>
                     <option value="week">Tuần</option>
@@ -799,11 +510,13 @@ const Dashboard = () => {
                     onChange={(e) => setSelectedPeriods({ ...selectedPeriods, period1: e.target.value })}
                   >
                     <option value="">Chọn</option>
-                    {periodOptions[selectedPeriods.type].map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
+                    {financeData.period_options
+                      .filter((opt) => opt.value)
+                      .map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {selectedPeriods.type === 'week' ? formatWeekLabel(opt.value) : opt.label}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
@@ -814,86 +527,64 @@ const Dashboard = () => {
                     onChange={(e) => setSelectedPeriods({ ...selectedPeriods, period2: e.target.value })}
                   >
                     <option value="">Chọn</option>
-                    {periodOptions[selectedPeriods.type].map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
+                    {financeData.period_options
+                      .filter((opt) => opt.value)
+                      .map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {selectedPeriods.type === 'week' ? formatWeekLabel(opt.value) : opt.label}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <button className="btn btn-primary" onClick={comparePeriods}>
                   So sánh
                 </button>
               </div>
-              {barChartData && (
+              {barChartData ? (
                 <div style={{ width: '100%', height: '400px' }}>
                   <Bar data={barChartData} options={barChartOptions} />
                 </div>
+              ) : (
+                <p className="text-muted">Vui lòng chọn hai khoảng thời gian để so sánh.</p>
               )}
             </div>
           </div>
-
-          {/* Spending Categories */}
           <div className="mb-4">
             <h4 className="mb-4 text-dark">Phân loại chi tiêu</h4>
             <div className="row g-3 mb-4">
-              {uniqueCategories.map((category, index) => (
-                <div key={`${category.name}-${index}`} className="col-md-3 col-sm-6">
-                  <div
-                    className={`card text-white ${
-                      category.name === 'Ăn uống'
-                        ? 'bg-danger'
-                        : category.name === 'Giải trí'
-                        ? 'bg-warning'
-                        : category.name === 'Di chuyển'
-                        ? 'bg-success'
-                        : 'bg-primary'
-                    } shadow-sm h-100 border-0`}
-                    style={{
-                      transition: 'transform 0.3s, box-shadow 0.3s',
-                      cursor: 'pointer',
-                      borderRadius: '12px',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.03)';
-                      e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-                    }}
-                  >
-                    <div className="card-body d-flex align-items-center">
-                      <i
-                        className={`${
-                          category.name === 'Ăn uống'
-                            ? 'fas fa-utensils'
-                            : category.name === 'Giải trí'
-                            ? 'fas fa-gamepad'
-                            : category.name === 'Di chuyển'
-                            ? 'fas fa-car'
-                            : 'fas fa-ellipsis-h'
-                        } me-3 fs-3`}
-                      ></i>
-                      <div>
-                        <h5 className="card-title mb-1">{category.name}</h5>
-                        <p className="card-text mb-0">{category.value.toLocaleString()}₫</p>
+              {uniqueCategories.length > 0 ? (
+                uniqueCategories.map((category, index) => (
+                  <div key={`${category.name}-${index}`} className="col-md-3 col-sm-6">
+                    <div
+                      className={`card text-white ${index % 4 === 0 ? 'bg-danger' : index % 4 === 1 ? 'bg-warning' : index % 4 === 2 ? 'bg-success' : 'bg-primary'} shadow-sm h-100 border-0`}
+                      style={{ transition: 'transform 0.3s', cursor: 'pointer', borderRadius: '12px' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      <div className="card-body d-flex align-items-center">
+                        <i className="fas fa-ellipsis-h me-3 fs-3"></i>
+                        <div>
+                          <h5 className="card-title mb-1">{category.name}</h5>
+                          <p className="card-text mb-0">{category.value.toLocaleString()}₫</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-muted">Không có dữ liệu chi tiêu để hiển thị.</p>
+              )}
             </div>
-            <div className="card shadow-sm border-0">
-              <div className="card-body">
-                <div style={{ width: '100%', height: '300px' }}>
-                  <Pie data={pieChartData} options={pieChartOptions} />
+            {uniqueCategories.length > 0 ? (
+              <div className="card shadow-sm border-0">
+                <div className="card-body">
+                  <div style={{ width: '100%', height: '300px' }}>
+                    <Pie data={pieChartData} options={pieChartOptions} />
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
-
-          {/* Transaction History */}
           <div className="mt-5">
             <h4 className="mb-4 text-dark">Lịch sử thu/chi</h4>
             <div className="card shadow-sm border-0">
@@ -913,69 +604,36 @@ const Dashboard = () => {
                       {paginatedTransactions.map((row, index) => (
                         <tr
                           key={index}
-                          style={{
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                            backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa',
-                          }}
+                          style={{ transition: 'background-color 0.2s', backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa' }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e9ecef')}
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa')
-                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa')}
                         >
                           <td className="px-4 py-3">{row.date}</td>
-                          <td className="px-4 py-3">
-                            <span className={`badge ${row.type === 'Thu' ? 'bg-success' : 'bg-danger'}`}>
-                              {row.type}
-                            </span>
-                          </td>
+                          <td className="px-4 py-3"><span className={`badge ${row.type === 'Thu' ? 'bg-success' : 'bg-danger'}`}>{row.type}</span></td>
                           <td className="px-4 py-3">{row.category}</td>
-                          <td className="px-4 py-3">{row.amount}₫</td>
+                          <td className="px-4 py-3">{row.amount.toLocaleString()}₫</td>
                           <td className="px-4 py-3">{row.description}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                {/* Pagination */}
                 {totalPages > 1 && (
-                  <nav aria-label="Transaction history pagination" className="mt-3">
+                  <nav className="mt-3">
                     <ul className="pagination justify-content-center">
                       <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                        <button
-                          className="page-link"
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                        >
-                          Trước
-                        </button>
+                        <button className="page-link" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Trước</button>
                       </li>
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <li
-                          key={page}
-                          className={`page-item ${currentPage === page ? 'active' : ''}`}
-                        >
-                          <button
-                            className="page-link"
-                            onClick={() => handlePageChange(page)}
-                          >
-                            {page}
-                          </button>
+                        <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                          <button className="page-link" onClick={() => handlePageChange(page)}>{page}</button>
                         </li>
                       ))}
                       <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                        <button
-                          className="page-link"
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                        >
-                          Sau
-                        </button>
+                        <button className="page-link" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>Sau</button>
                       </li>
                     </ul>
-                    <div className="text-center">
-                      Trang {currentPage} / {totalPages}
-                    </div>
+                    <div className="text-center">Trang {currentPage} / {totalPages}</div>
                   </nav>
                 )}
               </div>

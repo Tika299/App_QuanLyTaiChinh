@@ -9,20 +9,27 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $table = 'categories';
-
+    // Các thuộc tính có thể gán hàng loạt
     protected $fillable = [
         'user_id',
         'name',
+        'type',
+        'color',
     ];
 
-    protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
-
+    /**
+     * Quan hệ: Category thuộc về một User
+     */
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Quan hệ: Category có nhiều Goal
+     */
+    public function goals()
+    {
+        return $this->hasMany(Goal::class);
     }
 }

@@ -18,6 +18,9 @@ return new class extends Migration {
             $table->string('password');
             $table->string('avatar')->default('default.png');
             $table->decimal('balance', 15, 2)->default(0); // Thêm cột balance
+            $table->string('phone')->nullable();
+            $table->string('city')->nullable();
+            $table->text('bio')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });

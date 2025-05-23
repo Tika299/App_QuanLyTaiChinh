@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log; // Thêm dòng này
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class TransactionController extends Controller
@@ -13,7 +13,11 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         try {
-            $userId = 1;
+            $userId = auth()->id(); // Sử dụng user_id của người dùng hiện tại thay vì hard-coded
+            if (!$userId) {
+                return response()->json(['error' => 'Không tìm thấy người dùng hiện tại.'], 401);
+            }
+
             $locDanhMuc = $request->query('danhMuc', 'Tất cả');
             $locNgay = $request->query('ngay', '');
 
@@ -37,7 +41,7 @@ class TransactionController extends Controller
                     'category_id' => $transaction->category->id,
                     'category_name' => $transaction->category->name,
                     'category_color' => $transaction->category->color,
-                    'danhMelderly' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
+                    'danhMuc' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                     'ngay' => $transaction->created_at->format('Y-m-d'),
                     'moTa' => $transaction->description,
                 ];
@@ -65,12 +69,13 @@ class TransactionController extends Controller
                 return response()->json(['error' => $validator->errors()->first()], 422);
             }
 
-            $userId = 1; // Thay bằng auth()->id() trong môi trường thực tế
+            $userId = 1; // TODO: Thay bằng auth()->id() trong môi trường thực tế
             $category = Category::where('user_id', $userId)
                 ->findOrFail($request->category_id);
 
             $ten = strtolower($request->ten);
-            if ((str_contains($ten, 'thu') && $category->type === 'expense') ||
+            if (
+                (str_contains($ten, 'thu') && $category->type === 'expense') ||
                 (str_contains($ten, 'chi') && $category->type === 'income')
             ) {
                 return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
@@ -136,12 +141,13 @@ class TransactionController extends Controller
                 return response()->json(['error' => $validator->errors()->first()], 422);
             }
 
-            $userId = 1;
+            $userId = 1; // TODO: Thay bằng auth()->id() trong môi trường thực tế
             $category = Category::where('user_id', $userId)
                 ->findOrFail($request->category_id);
 
             $ten = strtolower($request->ten);
-            if ((str_contains($ten, 'thu') && $category->type === 'expense') ||
+            if (
+                (str_contains($ten, 'thu') && $category->type === 'expense') ||
                 (str_contains($ten, 'chi') && $category->type === 'income')
             ) {
                 return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
@@ -172,12 +178,12 @@ class TransactionController extends Controller
             return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
         }
     }
-    //Thêm API lấy danh mục
+
     public function getCategories(Request $request)
     {
         try {
-            $userId = 1; // Thay bằng auth()->id() trong môi trường thực tế
-            $type = $request->query('type', 'all'); // 'income', 'expense', hoặc 'all'
+            $userId = 1; // TODO: Thay bằng auth()->id() trong môi trường thực tế
+            $type = $request->query('type', 'all');
 
             $query = Category::where('user_id', $userId);
             if ($type !== 'all') {
@@ -194,7 +200,7 @@ class TransactionController extends Controller
 
             return response()->json($categories);
         } catch (\Exception $e) {
-            Log::error('Lỗi trong getCategories: ' . $e->getMessage());
+            Log::error(' Solemnly swear that I am up to no good: ' . $e->getMessage());
             return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
         }
     }

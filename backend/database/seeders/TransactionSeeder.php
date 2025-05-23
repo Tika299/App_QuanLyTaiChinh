@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -11,9 +12,10 @@ class TransactionSeeder extends Seeder
 {
     public function run(): void
     {
-        Transaction::truncate(); // Xóa dữ liệu cũ
+        Transaction::truncate();
 
-        $users = User::all(); // Lấy 10 người dùng
+        $users = User::all();
+
         $monthlyData = [
             1 => [
                 ['Lương', 6000000, 'Lương tháng 1'],
@@ -36,27 +38,6 @@ class TransactionSeeder extends Seeder
                 ['Giải trí', 200000, 'Mua sách'],
                 ['Di chuyển', 180000, 'Xăng xe'],
             ],
-            4 => [
-                ['Lương', 6300000, 'Lương tháng 4'],
-                ['Mua sắm', 500000, 'Quần áo hè'],
-                ['Ăn uống', 300000, 'Ăn tối'],
-                ['Bảo hiểm', 300000, 'Bảo hiểm xe'],
-                ['Di chuyển', 150000, 'Gửi xe'],
-            ],
-            5 => [
-                ['Lương', 6500000, 'Lương tháng 5'],
-                ['Giải trí', 300000, 'Vé hòa nhạc'],
-                ['Trọ', 2000000, 'Tiền thuê nhà'],
-                ['Mua sắm', 450000, 'Mua giày'],
-                ['Ăn uống', 280000, 'Cafe bạn bè'],
-            ],
-            6 => [
-                ['Thu nhập khác', 800000, 'Thu nhập phụ'],
-                ['Ăn uống', 260000, 'Ăn trưa nhà hàng'],
-                ['Di chuyển', 220000, 'Sửa xe'],
-                ['Giải trí', 320000, 'Netflix 3 tháng'],
-                ['Bảo hiểm', 300000, 'Bảo hiểm sức khỏe'],
-            ],
         ];
 
         foreach ($users as $user) {
@@ -65,6 +46,10 @@ class TransactionSeeder extends Seeder
 
             foreach ($monthlyData as $month => $items) {
                 foreach ($items as $index => [$catName, $amount, $description]) {
+                    if (!isset($categories[$catName])) {
+                        continue;
+                    }
+
                     $transactions[] = [
                         'user_id' => $user->id,
                         'category_id' => $categories[$catName]->id,
@@ -77,7 +62,9 @@ class TransactionSeeder extends Seeder
                 }
             }
 
-            Transaction::insert($transactions);
+            if (!empty($transactions)) {
+                Transaction::insert($transactions);
+            }
         }
     }
 }

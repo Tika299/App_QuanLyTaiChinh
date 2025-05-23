@@ -10,113 +10,29 @@ class CategorySeeder extends Seeder
 {
     public function run(): void
     {
-        Category::truncate(); // Xóa dữ liệu cũ
-
-        $categoryNames = [
-            'Lương',
-            'Ăn uống',
-            'Trọ',
-            'Di chuyển',
-            'Giải trí',
-            'Mua sắm',
-            'Bảo hiểm',
-            'Thưởng',
-            'Thu nhập khác',
-        ];
-        $categories = [
-            // Danh mục thu nhập
-            [
-                'user_id' => $userId,
-                'type' => 'income',
-                'name' => 'Lương',
-                'color' => '#4CAF50', // Xanh lá - biểu thị thu nhập tích cực
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'income',
-                'name' => 'Thưởng',
-                'color' => '#66BB6A', // Xanh lá nhạt
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'income',
-                'name' => 'Thu nhập khác',
-                'color' => '#81C784', // Xanh lá sáng
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            // Danh mục chi tiêu
-            [
-                'user_id' => $userId,
-                'type' => 'expense',
-                'name' => 'Ăn uống',
-                'color' => '#FF5722', // Cam đậm - chi tiêu hàng ngày
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'expense',
-                'name' => 'Mua sắm',
-                'color' => '#F06292', // Hồng - chi tiêu không thiết yếu
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'expense',
-                'name' => 'Bảo hiểm',
-                'color' => '#0288D1', // Xanh dương - chi phí cố định
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'expense',
-                'name' => 'Trọ',
-                'color' => '#0288D1', // Xanh dương - chi phí cố định
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'expense',
-                'name' => 'Di chuyển',
-                'color' => '#7B1FA2', // Tím - chi phí đi lại
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id' => $userId,
-                'type' => 'expense',
-                'name' => 'Giải trí',
-                'color' => '#FFCA28', // Vàng - chi tiêu tùy chọn
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+        $defaultCategories = [
+            ['name' => 'Lương', 'type' => 'income', 'color' => '#4CAF50'],
+            ['name' => 'Thưởng', 'type' => 'income', 'color' => '#2196F3'],
+            ['name' => 'Thu nhập khác', 'type' => 'income', 'color' => '#8BC34A'],
+            ['name' => 'Ăn uống', 'type' => 'expense', 'color' => '#F44336'],
+            ['name' => 'Giải trí', 'type' => 'expense', 'color' => '#FF9800'],
+            ['name' => 'Trọ', 'type' => 'expense', 'color' => '#9C27B0'],
+            ['name' => 'Di chuyển', 'type' => 'expense', 'color' => '#3F51B5'],
+            ['name' => 'Mua sắm', 'type' => 'expense', 'color' => '#795548'],
+            ['name' => 'Bảo hiểm', 'type' => 'expense', 'color' => '#009688'],
         ];
 
         $users = User::all();
 
         foreach ($users as $user) {
-            foreach ($categoryNames as $name) {
+            foreach ($defaultCategories as $cat) {
                 Category::create([
                     'user_id' => $user->id,
-                    'name' => $name,
+                    'name' => $cat['name'],
+                    'type' => $cat['type'],
+                    'color' => $cat['color'],
                 ]);
             }
-        }
-
-        // Tùy chọn: tạo các danh mục chung không thuộc user nào
-        foreach ($categoryNames as $name) {
-            Category::create([
-                'user_id' => null,
-                'name' => $name,
-            ]);
         }
     }
 }

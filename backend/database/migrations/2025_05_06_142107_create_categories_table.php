@@ -10,15 +10,11 @@ return new class extends Migration
     {
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id')->nullable(); // Có thể null
-            $table->string('name');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('name', 225);
-            $table->string('color', 50);
-            $table->enum('type', ['income', 'expense']);
-            $table->timestamps();
-
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Gắn với user
+            $table->string('name'); // Tên danh mục: Lương, Ăn uống,...
+            $table->enum('type', ['income', 'expense'])->default('expense'); // Thu hoặc Chi
+            $table->string('color', 7)->nullable(); // Mã màu HEX, ví dụ: #FF0000
+            $table->timestamps(); // created_at và updated_at
         });
     }
 
