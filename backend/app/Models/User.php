@@ -4,10 +4,12 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Notifications\ResetPasswordNotification;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+
 
 class User extends Authenticatable
 {
@@ -18,15 +20,28 @@ class User extends Authenticatable
      *
      * @var array<int, string>
      */
-    protected $fillable = ['username', 'email', 'password', 'role', 'avatar', 'phone', 'city', 'bio'];
-    
+    protected $fillable = [
+        'username',
+        'email',
+        'password',
+        'image',
+        'balance',
+        'avatar',
+        'phone',
+        'city',
+        'bio',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.
      *
      * @var array<int, string>
      */
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
     /**
      * The attributes that should be cast.
      *
@@ -36,9 +51,15 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
 
-    // Thêm mối quan hệ với Transaction
-    public function transactions()
+    public function sendPasswordResetNotification($token)
     {
-        return $this->hasMany(Transaction::class);
+        $this->notify(new ResetPasswordNotification($token, $this->email));
     }
+
+    
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'user_role');
+    }
+
 }
