@@ -10,7 +10,8 @@ const GoalList = ({ goals, categories, currentPage, totalPages, setCurrentPage }
             <th>Tên</th>
             <th>Danh Mục</th>
             <th>Số Tiền</th>
-            <th>Hạn</th>
+            <th>Kỳ Góp</th> 
+            <th>Thời Hạn</th> 
             <th>Ghi Chú</th>
           </tr>
         </thead>
@@ -26,12 +27,17 @@ const GoalList = ({ goals, categories, currentPage, totalPages, setCurrentPage }
                     ? new Date(goal.due_date.includes('T') ? goal.due_date.split('T')[0] : goal.due_date).toLocaleDateString('vi-VN')
                     : 'Không có hạn'}
                 </td>
+                <td>
+                  {goal.deadline
+                    ? new Date(goal.deadline.includes('T') ? goal.deadline.split('T')[0] : goal.deadline).toLocaleDateString('vi-VN')
+                    : 'Không có hạn cuối'}
+                </td> 
                 <td>{goal.note || 'Không có ghi chú'}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="5" className="text-center">
+              <td colSpan="7" className="text-center">
                 Chưa có mục tiêu nào.
               </td>
             </tr>
