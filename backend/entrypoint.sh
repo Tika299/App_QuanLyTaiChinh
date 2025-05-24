@@ -6,8 +6,7 @@ MARKER_FILE=/var/www/storage/.initialized
 if [ ! -f "$MARKER_FILE" ]; then
     echo "Running initial setup..."
     php artisan key:generate
-    php artisan migrate --force
-    php artisan db:seed --force
+    php artisan migrate --seed --force
     touch $MARKER_FILE
     echo "Initial setup completed."
 else

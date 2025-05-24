@@ -10,7 +10,6 @@ class GoalSeeder extends Seeder
 {
     public function run(): void
     {
-        Goal::truncate(); // Xóa dữ liệu cũ
 
         $user1 = \App\Models\User::where('email', 'admin@gmail.com')->first();
         $user2 = \App\Models\User::where('email', 'user2@gmail.com')->first();

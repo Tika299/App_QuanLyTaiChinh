@@ -5,10 +5,10 @@ import { useNavigate } from 'react-router-dom';
 const ViewModal = ({ selectedUser }) => {
   const getAvatarUrl = useCallback((avatar) => {
     if (!avatar || avatar === 'null' || avatar === 'undefined') {
-      return 'http://127.0.0.1:8000/storage/avatars/default.png';
+      return 'http://localhost/storage/avatars/default.png';
     }
     const cleanAvatar = avatar.split('?')[0];
-    return `http://127.0.0.1:8000/storage/avatars/${cleanAvatar}?t=${Date.now()}`;
+    return `http://localhost/storage/avatars/${cleanAvatar}?t=${Date.now()}`;
   }, []);
 
   return (
@@ -147,8 +147,8 @@ const UserList = () => {
   const getAvatarUrl = useCallback(
     (avatar) =>
       avatar && avatar !== 'null' && avatar !== 'undefined'
-        ? `http://127.0.0.1:8000/storage/avatars/${avatar}`
-        : 'http://127.0.0.1:8000/storage/avatars/default.png',
+        ? `http://localhost/storage/avatars/${avatar}`
+        : 'http://localhost/storage/avatars/default.png',
     []
   );
 
@@ -160,7 +160,7 @@ const UserList = () => {
       setError(null);
 
       try {
-        await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+        await axios.get('http://localhost/sanctum/csrf-cookie', {
           withCredentials: true,
         });
 
@@ -180,7 +180,7 @@ const UserList = () => {
         };
 
         console.log(`Gửi yêu cầu: GET /api/listuser?page=${page}`);
-        const response = await axios.get(`http://127.0.0.1:8000/api/listuser?page=${page}`, config);
+        const response = await axios.get(`http://localhost/api/listuser?page=${page}`, config);
         console.log('Phản hồi:', response.data);
 
         const newUsers = (response.data.data || []).map((user) => {
@@ -229,7 +229,7 @@ const UserList = () => {
         };
 
         console.log(`Gửi yêu cầu: GET /api/listuser/${id}`);
-        const response = await axios.get(`http://127.0.0.1:8000/api/listuser/${id}`, config);
+        const response = await axios.get(`http://localhost/api/listuser/${id}`, config);
         console.log('Phản hồi:', response.data);
 
         const user = response.data;
@@ -308,7 +308,7 @@ const UserList = () => {
 
         console.log('Gửi yêu cầu: PUT /api/update/' + editForm.id);
         console.log('FormData:', [...formData.entries()]);
-        const response = await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, config);
+        const response = await axios.post(`http://localhost/api/update/${editForm.id}`, formData, config);
 
         console.log('Phản hồi:', response.data);
 
@@ -358,7 +358,7 @@ const UserList = () => {
         };
 
         console.log(`Gửi yêu cầu: DELETE /api/delete/${id}`);
-        await axios.delete(`http://127.0.0.1:8000/api/delete/${id}`, config);
+        await axios.delete(`http://localhost/api/delete/${id}`, config);
 
         // Hiển thị thông báo thành công với window.alert
         window.alert('Xóa người dùng thành công!');

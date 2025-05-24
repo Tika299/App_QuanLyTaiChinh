@@ -22,9 +22,9 @@ const ResetPassword = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
 
-      const response = await axios.post('http://127.0.0.1:8000/api/reset-password', {
+      const response = await axios.post('http://localhost/api/reset-password', {
         token,
         email,
         password,

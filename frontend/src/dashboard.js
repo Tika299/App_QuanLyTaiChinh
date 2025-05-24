@@ -88,7 +88,7 @@ const Dashboard = () => {
   // Hàm lấy dữ liệu từ API
   const fetchFinanceData = async (frame, year = null) => {
     try {
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+      await axios.get('http://localhost/sanctum/csrf-cookie', {
         withCredentials: true,
       });
 
@@ -101,8 +101,8 @@ const Dashboard = () => {
 
       const timestamp = new Date().getTime();
       const url = year
-        ? `http://127.0.0.1:8000/api/finance?type=${frame}&year=${year}&t=${timestamp}`
-        : `http://127.0.0.1:8000/api/finance?type=${frame}&t=${timestamp}`;
+        ? `http://localhost/api/finance?type=${frame}&year=${year}&t=${timestamp}`
+        : `http://localhost/api/finance?type=${frame}&t=${timestamp}`;
       const response = await axios.get(url, {
         withCredentials: true,
         headers: {
@@ -170,7 +170,7 @@ const Dashboard = () => {
     }
 
     try {
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+      await axios.get('http://localhost/sanctum/csrf-cookie', {
         withCredentials: true,
       });
 
@@ -183,7 +183,7 @@ const Dashboard = () => {
 
       const timestamp = new Date().getTime();
       const response = await axios.get(
-        `http://127.0.0.1:8000/api/finance/compare?type=${selectedPeriods.type}&period1=${selectedPeriods.period1}&period2=${selectedPeriods.period2}&t=${timestamp}`,
+        `http://localhost/api/finance/compare?type=${selectedPeriods.type}&period1=${selectedPeriods.period1}&period2=${selectedPeriods.period2}&t=${timestamp}`,
         {
           withCredentials: true,
           headers: {

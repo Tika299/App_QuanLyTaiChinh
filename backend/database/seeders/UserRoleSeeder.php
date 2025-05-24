@@ -10,8 +10,6 @@ class UserRoleSeeder extends Seeder
 
     public function run(): void
     {
-        // Xóa bảng user_role trước khi gán lại
-        DB::table('user_role')->truncate();
 
         // Gán role admin cho user_id = 1
         DB::table('user_role')->insert([

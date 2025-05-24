@@ -12,8 +12,6 @@ class UserSeeder extends Seeder
 
     public function run(): void
     {
-        // Xóa toàn bộ dữ liệu bảng users
-        User::truncate();
 
         // Tạo tài khoản admin
         User::create([

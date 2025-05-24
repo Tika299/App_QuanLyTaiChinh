@@ -62,12 +62,12 @@ const LoginForm = () => {
         }
 
         try {
-            await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+            await axios.get('http://localhost/sanctum/csrf-cookie', {
                 withCredentials: true,
             });
 
             const response = await axios.post(
-                'http://127.0.0.1:8000/api/login',
+                'http://localhost/api/login',
                 { email, password },
                 { withCredentials: true }
             );

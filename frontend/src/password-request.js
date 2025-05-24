@@ -10,11 +10,11 @@ const ForgotPasswordRequest = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+      await axios.get('http://localhost/sanctum/csrf-cookie', {
         withCredentials: true,
       });
 
-      const response = await axios.post('http://127.0.0.1:8000/api/forgot-password', {
+      const response = await axios.post('http://localhost/api/forgot-password', {
         email,
       }, {
         withCredentials: true,

@@ -25,12 +25,12 @@ const Logout = () => {
           return;
         }
 
-        await axios.get("http://127.0.0.1:8000/sanctum/csrf-cookie", {
+        await axios.get("http://localhost/sanctum/csrf-cookie", {
           withCredentials: true,
         });
 
         await axios.post(
-          "http://127.0.0.1:8000/api/logout",
+          "http://localhost/api/logout",
           {},
           {
             withCredentials: true,

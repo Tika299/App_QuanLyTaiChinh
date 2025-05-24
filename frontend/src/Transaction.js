@@ -7,7 +7,7 @@ import Slider from './Slider';
 import { useNavigate } from 'react-router-dom';
 
 // Cấu hình axios
-axios.defaults.baseURL = 'http://127.0.0.1:8000/api';
+axios.defaults.baseURL = 'http://localhost/api';
 axios.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -118,7 +118,7 @@ function Transaction() {
 
     try {
       setLoading(true);
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const response = await axios.post(
         '/transactions',
         {
@@ -168,7 +168,7 @@ function Transaction() {
 
     try {
       setLoading(true);
-      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const response = await axios.put(
         `/transactions/${formDataEdit.id}`,
         {

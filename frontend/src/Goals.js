@@ -39,7 +39,7 @@ const Goals = () => {
 
   const fetchGoals = async () => {
     try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
         setFlashMessage({ type: 'error', message: 'Vui lòng đăng nhập lại.' });
@@ -47,7 +47,7 @@ const Goals = () => {
         return;
       }
 
-      const response = await axios.get(`http://localhost:8000/api/goals?page=${currentPage}`, {
+      const response = await axios.get(`http://localhost/api/goals?page=${currentPage}`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
@@ -61,7 +61,7 @@ const Goals = () => {
 
   const fetchCategories = async () => {
     try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
         setFlashMessage({ type: 'error', message: 'Vui lòng đăng nhập lại.' });
@@ -69,7 +69,7 @@ const Goals = () => {
         return;
       }
 
-      const response = await axios.get('http://localhost:8000/api/categories', {
+      const response = await axios.get('http://localhost/api/categories', {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
@@ -92,7 +92,7 @@ const Goals = () => {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
         setFlashMessage({ type: 'error', message: 'Vui lòng đăng nhập lại.' });
@@ -122,7 +122,7 @@ const Goals = () => {
       }
 
       console.log('Payload:', payload);
-      const response = await axios.post('http://localhost:8000/api/goals', payload, {
+      const response = await axios.post('http://localhost/api/goals', payload, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
@@ -184,7 +184,7 @@ const Goals = () => {
       return;
     }
     try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
         setFlashMessage({ type: 'error', message: 'Vui lòng đăng nhập lại.' });
@@ -201,7 +201,7 @@ const Goals = () => {
         category_id: parseInt(editFormData.category_id),
       };
 
-      await axios.put(`http://localhost:8000/api/goals/${editFormData.goal_id}`, payload, {
+      await axios.put(`http://localhost/api/goals/${editFormData.goal_id}`, payload, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
@@ -242,7 +242,7 @@ const Goals = () => {
       return;
     }
     try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
         setFlashMessage({ type: 'error', message: 'Vui lòng đăng nhập lại.' });
@@ -250,7 +250,7 @@ const Goals = () => {
         return;
       }
 
-      const url = deleteGoalId === 'all' ? 'http://localhost:8000/api/goals/delete-all' : `http://localhost:8000/api/goals/${deleteGoalId}`;
+      const url = deleteGoalId === 'all' ? 'http://localhost/api/goals/delete-all' : `http://localhost/api/goals/${deleteGoalId}`;
       await axios.delete(url, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,

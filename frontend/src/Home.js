@@ -169,7 +169,7 @@ function Home() {
     // Lấy dữ liệu từ API
     const fetchFinanceData = async (frame) => {
         try {
-            await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
+            await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
             const token = localStorage.getItem('token');
             if (!token) {
                 toast.error('Vui lòng đăng nhập lại.');
@@ -177,7 +177,7 @@ function Home() {
                 return;
             }
 
-            const response = await axios.get(`http://127.0.0.1:8000/api/finance?type=${frame}`, {
+            const response = await axios.get(`http://localhost/api/finance?type=${frame}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 

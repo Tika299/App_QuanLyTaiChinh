@@ -25,14 +25,14 @@ const EditProfile = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+        await axios.get('http://localhost/sanctum/csrf-cookie', {
           withCredentials: true,
         });
         const token = localStorage.getItem('token');
         if (!token) {
           throw new Error('Vui lòng đăng nhập lại.');
         }
-        const response = await axios.get('http://127.0.0.1:8000/api/user', {
+        const response = await axios.get('http://localhost/api/user', {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         });
@@ -119,7 +119,7 @@ const EditProfile = () => {
 
         console.log('Gửi yêu cầu: PUT /api/update/' + userId);
         console.log('FormData:', [...formDataToSend.entries()]);
-        const response = await axios.post(`http://127.0.0.1:8000/api/update/${userId}`, formDataToSend, config);
+        const response = await axios.post(`http://localhost/api/update/${userId}`, formDataToSend, config);
 
         console.log('Phản hồi:', response.data);
         setFlashMessage({ type: 'success', message: response.data.message });
@@ -235,7 +235,7 @@ const EditProfile = () => {
                     {formData.avatar && typeof formData.avatar === 'string' && formData.avatar.trim() !== '' && !imageError ? (
                       <div className="mb-2">
                         <img
-                          src={`http://127.0.0.1:8000/storage/avatars/${formData.avatar}`}
+                          src={`http://localhost/storage/avatars/${formData.avatar}`}
                           alt="Avatar hiện tại"
                           className="img-fluid rounded"
                           style={{ maxWidth: '150px', maxHeight: '150px', border: '2px solid #e9ecef' }}

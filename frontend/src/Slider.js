@@ -10,8 +10,8 @@ function Slider() {
     // Hàm lấy URL avatar
     const getAvatarUrl = (avatar) =>
         avatar && avatar !== 'null' && avatar !== 'undefined'
-            ? `http://127.0.0.1:8000/storage/avatars/${avatar}`
-            : 'http://127.0.0.1:8000/storage/avatars/default.png';
+            ? `http://localhost/storage/avatars/${avatar}`
+            : 'http://localhost/storage/avatars/default.png';
 
     // Hàm kiểm tra đường dẫn hiện tại để thêm class active
     const isActive = (path) =>
@@ -21,7 +21,7 @@ function Slider() {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
+                await axios.get('http://localhost/sanctum/csrf-cookie', {
                     withCredentials: true,
                 });
 
@@ -32,7 +32,7 @@ function Slider() {
                     return;
                 }
 
-                const response = await axios.get('http://127.0.0.1:8000/api/user', {
+                const response = await axios.get('http://localhost/api/user', {
                     withCredentials: true,
                     headers: { Authorization: `Bearer ${token}` },
                 });
@@ -89,7 +89,7 @@ function Slider() {
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#table" />
                         </svg>
-                        Orders
+                        Transactions
                     </Link>
                 </li>
                 <li>
@@ -97,7 +97,7 @@ function Slider() {
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#grid" />
                         </svg>
-                        Products
+                        Goals
                     </Link>
                 </li>
                 <li>

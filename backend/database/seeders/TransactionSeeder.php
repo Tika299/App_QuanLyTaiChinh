@@ -12,7 +12,6 @@ class TransactionSeeder extends Seeder
 {
     public function run(): void
     {
-        Transaction::truncate();
 
         $users = User::all();
 
