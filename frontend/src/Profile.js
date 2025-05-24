@@ -49,7 +49,7 @@ const Profile = () => {
             Accept: 'application/json',
           },
         };
-        const response = await axios.get('http://localhost:8000/api/user', {
+        const response = await axios.get('http://localhost/api/user', {
           ...config,
           signal: controller.signal,
         });
@@ -97,8 +97,8 @@ const Profile = () => {
 
   const avatarUrl =
     user.avatar && typeof user.avatar === 'string' && user.avatar.trim() !== ''
-      ? `http://localhost:8000/storage/avatars/${user.avatar}`
-      : 'http://localhost:8000/storage/avatars/default.png';
+      ? `http://localhost/storage/avatars/${user.avatar}`
+      : 'http://localhost/storage/avatars/default.png';
 
   const formattedRole = user.role
     ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
@@ -136,8 +136,8 @@ const Profile = () => {
                       className="img-fluid rounded-circle mb-3"
                       style={{ maxWidth: '150px', height: 'auto', border: '2px solid #e9ecef' }}
                       onError={(e) => {
-                        if (e.target.src !== 'http://localhost:8000/storage/avatars/default.png') {
-                          e.target.src = 'http://localhost:8000/storage/avatars/default.png';
+                        if (e.target.src !== 'http://localhost/storage/avatars/default.png') {
+                          e.target.src = 'http://localhost/storage/avatars/default.png';
                         }
                       }}
                     />
