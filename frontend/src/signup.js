@@ -9,7 +9,6 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('');
 
   const navigate = useNavigate();
 
@@ -17,7 +16,7 @@ function SignupForm() {
     e.preventDefault();
 
     // Kiểm tra trống
-    if (!username || !email || !password || !confirmPassword || !role) {
+    if (!username || !email || !password || !confirmPassword) {
       toast.warn('Vui lòng điền đầy đủ thông tin.', { position: 'top-right' });
       return;
     }
@@ -57,7 +56,7 @@ function SignupForm() {
           email,
           password,
           password_confirmation: confirmPassword,
-          role,
+          role: 'member', // Fixed to 'member' for public signup
         },
         { withCredentials: true }
       );
@@ -77,7 +76,7 @@ function SignupForm() {
               color: '#fff',
               border: 'none',
               borderRadius: '4px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             Chuyển đến đăng nhập
@@ -87,7 +86,7 @@ function SignupForm() {
           position: 'top-right',
           autoClose: false,
           closeOnClick: false,
-          pauseOnHover: true
+          pauseOnHover: true,
         }
       );
     } catch (error) {
@@ -171,21 +170,6 @@ function SignupForm() {
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
-        </div>
-
-        <div className="mb-3">
-          <label htmlFor="role" className="form-label">Vai trò</label>
-          <select
-            className="form-select"
-            id="role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            required
-          >
-            <option value="">-- Chọn vai trò --</option>
-            <option value="member">Người dùng</option>
-            <option value="admin">Quản trị viên</option>
-          </select>
         </div>
 
         <button type="submit" className="btn btn-primary">Đăng Ký</button>

@@ -32,4 +32,9 @@ class Category extends Model
     {
         return $this->hasMany(Goal::class);
     }
+
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
 }

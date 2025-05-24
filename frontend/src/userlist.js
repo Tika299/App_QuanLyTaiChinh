@@ -7,10 +7,10 @@ const ViewModal = ({ selectedUser }) => {
     if (!avatar || avatar === 'null' || avatar === 'undefined') {
       return 'http://127.0.0.1:8000/storage/avatars/default.png';
     }
-
-    const cleanAvatar = avatar.split('?')[0]; // Xoá ?t= cũ nếu có
+    const cleanAvatar = avatar.split('?')[0];
     return `http://127.0.0.1:8000/storage/avatars/${cleanAvatar}?t=${Date.now()}`;
   }, []);
+
   return (
     <div className="modal fade" id="viewModal" tabIndex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
       <div className="modal-dialog">
@@ -276,6 +276,11 @@ const UserList = () => {
         return;
       }
 
+      // Hiển thị confirm dialog với window.confirm
+      if (!window.confirm('Bạn có chắc muốn lưu các thay đổi này?')) {
+        return;
+      }
+
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -288,10 +293,10 @@ const UserList = () => {
         formData.append('email', editForm.email);
         formData.append('role', editForm.role);
         if (editForm.avatar) {
-          console.log('Avatar:', editForm.avatar); // Debug file
+          console.log('Avatar:', editForm.avatar);
           formData.append('avatar', editForm.avatar);
         }
-        formData.append('_method', 'PUT'); // Thêm để hỗ trợ giả lập PUT nếu cần
+        formData.append('_method', 'PUT');
 
         const config = {
           withCredentials: true,
@@ -302,7 +307,7 @@ const UserList = () => {
         };
 
         console.log('Gửi yêu cầu: PUT /api/update/' + editForm.id);
-        console.log('FormData:', [...formData.entries()]); // Debug FormData
+        console.log('FormData:', [...formData.entries()]);
         const response = await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, config);
 
         console.log('Phản hồi:', response.data);
@@ -313,11 +318,14 @@ const UserList = () => {
           modal.hide();
         }
 
+        // Hiển thị thông báo thành công với window.alert
+        window.alert('Cập nhật người dùng thành công!');
+
         fetchUsers(currentPage);
       } catch (err) {
         console.error('Lỗi handleEditSubmit:', err.response || err.message);
         if (err.response && err.response.data && err.response.data.errors) {
-          console.log('Chi tiết lỗi:', err.response.data.errors); // Debug lỗi 422
+          console.log('Chi tiết lỗi:', err.response.data.errors);
           setEditErrors(err.response.data.errors);
         } else {
           setEditErrors({ general: [err.response?.data?.message || err.message] });
@@ -329,7 +337,10 @@ const UserList = () => {
 
   const handleDelete = useCallback(
     async (id) => {
-      if (!window.confirm('Bạn có chắc muốn xóa người dùng này?')) return;
+      // Hiển thị confirm dialog với window.confirm
+      if (!window.confirm('Bạn có chắc muốn xóa người dùng này?')) {
+        return;
+      }
 
       try {
         const token = localStorage.getItem('token');
@@ -348,6 +359,9 @@ const UserList = () => {
 
         console.log(`Gửi yêu cầu: DELETE /api/delete/${id}`);
         await axios.delete(`http://127.0.0.1:8000/api/delete/${id}`, config);
+
+        // Hiển thị thông báo thành công với window.alert
+        window.alert('Xóa người dùng thành công!');
 
         fetchUsers(currentPage);
       } catch (err) {

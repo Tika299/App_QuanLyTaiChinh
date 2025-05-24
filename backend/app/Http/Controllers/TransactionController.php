@@ -54,58 +54,64 @@ class TransactionController extends Controller
         }
     }
 
-    public function store(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'ten' => 'required|string|max:50',
-                'soTien' => 'required|numeric|gt:0',
-                'category_id' => 'required|exists:categories,id',
-                'ngay' => 'required|date|before_or_equal:today',
-                'moTa' => 'nullable|string',
-            ]);
+   public function store(Request $request)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'ten' => 'required|string|max:50',
+            'soTien' => 'required|numeric|gt:0',
+            'category_id' => ['required', 'exists:categories,id,user_id,' . auth()->id()],
+            'ngay' => 'required|date|before_or_equal:today',
+            'moTa' => 'nullable|string',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json(['error' => $validator->errors()->first()], 422);
-            }
-
-            $userId = 1; // TODO: Thay bằng auth()->id() trong môi trường thực tế
-            $category = Category::where('user_id', $userId)
-                ->findOrFail($request->category_id);
-
-            $ten = strtolower($request->ten);
-            if (
-                (str_contains($ten, 'thu') && $category->type === 'expense') ||
-                (str_contains($ten, 'chi') && $category->type === 'income')
-            ) {
-                return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
-            }
-
-            $transaction = Transaction::create([
-                'user_id' => $userId,
-                'category_id' => $category->id,
-                'name' => $request->ten,
-                'amount' => $request->soTien,
-                'description' => $request->moTa,
-                'created_at' => $request->ngay,
-            ]);
-
-            return response()->json([
-                'id' => $transaction->id,
-                'ten' => $transaction->name,
-                'soTien' => $transaction->amount,
-                'category_id' => $category->id,
-                'category_name' => $category->name,
-                'danhMuc' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
-                'ngay' => $transaction->created_at->format('Y-m-d'),
-                'moTa' => $transaction->description,
-            ], 201);
-        } catch (\Exception $e) {
-            Log::error('Lỗi trong store: ' . $e->getMessage());
-            return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()->first()], 422);
         }
-    }
 
+        $userId = auth()->id();
+        if (!$userId) {
+            return response()->json(['error' => 'Không tìm thấy người dùng hiện tại.'], 401);
+        }
+
+        $category = Category::where('user_id', $userId)
+            ->findOrFail($request->category_id);
+
+        $ten = strtolower($request->ten);
+        if (
+            (str_contains($ten, 'thu') && $category->type === 'expense') ||
+            (str_contains($ten, 'chi') && $category->type === 'income')
+        ) {
+            return response()->json(['error' => 'Loại giao dịch không phù hợp với tên'], 422);
+        }
+
+        $transaction = Transaction::create([
+            'user_id' => $userId,
+            'category_id' => $category->id,
+            'name' => $request->ten,
+            'amount' => $request->soTien,
+            'description' => $request->moTa,
+            'created_at' => $request->ngay,
+        ]);
+
+        return response()->json([
+            'id' => $transaction->id,
+            'ten' => $transaction->name,
+            'soTien' => $transaction->amount,
+            'category_id' => $category->id,
+            'category_name' => $category->name,
+            'danhMuc' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
+            'ngay' => $transaction->created_at->format('Y-m-d'),
+            'moTa' => $transaction->description,
+        ], 201);
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        Log::error('Danh mục không tồn tại: ' . $e->getMessage());
+        return response()->json(['error' => 'Danh mục không tồn tại hoặc không thuộc về người dùng.'], 422);
+    } catch (\Exception $e) {
+        Log::error('Lỗi trong store: ' . $e->getMessage());
+        return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);
+    }
+}
     public function show($id)
     {
         try {
@@ -141,7 +147,7 @@ class TransactionController extends Controller
                 return response()->json(['error' => $validator->errors()->first()], 422);
             }
 
-            $userId = 1; // TODO: Thay bằng auth()->id() trong môi trường thực tế
+            $userId = auth()->$id(); // TODO: Thay bằng auth()->id() trong môi trường thực tế
             $category = Category::where('user_id', $userId)
                 ->findOrFail($request->category_id);
 
@@ -182,7 +188,7 @@ class TransactionController extends Controller
     public function getCategories(Request $request)
     {
         try {
-            $userId = 1; // TODO: Thay bằng auth()->id() trong môi trường thực tế
+            $userId = auth()->id(); // TODO: Thay bằng auth()->id() trong môi trường thực tế
             $type = $request->query('type', 'all');
 
             $query = Category::where('user_id', $userId);

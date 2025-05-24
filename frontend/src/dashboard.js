@@ -225,27 +225,34 @@ const Dashboard = () => {
 
   // Helper function to reformat week labels
   const formatWeekLabel = (label) => {
-    if (label && label.includes('-W')) {
+    if (!label) return 'Không xác định';
+    if (label.includes('-W')) {
       const [year, week] = label.split('-W');
       const weekNumber = parseInt(week, 10);
+      if (isNaN(weekNumber) || weekNumber < 1 || weekNumber > 53) {
+        return `Tuần không hợp lệ-${year}`;
+      }
       return `Tuần ${weekNumber}-${year}`;
     }
-    return label || '';
+    return label;
   };
-
   // Dữ liệu biểu đồ Line Chart
   const lineChartData = {
     labels: financeData.labels
       .map(formatWeekLabel)
+      .filter(label => label !== 'Không xác định')
       .sort((a, b) => {
-        const aMatch = a.match(/Tuần (\d+)-(\d+)/);
-        const bMatch = b.match(/Tuần (\d+)-(\d+)/);
-        if (!aMatch || !bMatch) return 0;
-        const [aWeek, aYear] = aMatch.slice(1).map(Number);
-        const [bWeek, bYear] = bMatch.slice(1).map(Number);
-        return aYear - bYear || aWeek - bWeek;
-      })
-      .filter(label => label),
+        if (!a || !b) return 0;
+        if (a.includes('Tuần') && b.includes('Tuần')) {
+          const aMatch = a.match(/Tuần (\d+)-(\d+)/);
+          const bMatch = b.match(/Tuần (\d+)-(\d+)/);
+          if (!aMatch || !bMatch) return 0;
+          const [aWeek, aYear] = aMatch.slice(1).map(Number);
+          const [bWeek, bYear] = bMatch.slice(1).map(Number);
+          return aYear - bYear || aWeek - bWeek;
+        }
+        return a.localeCompare(b);
+      }),
     datasets: [
       {
         label: 'Thu nhập',
@@ -254,7 +261,7 @@ const Dashboard = () => {
         backgroundColor: 'rgba(16, 185, 129, 0.4)',
         borderWidth: 4,
         tension: 0.4,
-        fill: true, // Sử dụng fill, cần plugin Filler
+        fill: true,
         pointBackgroundColor: 'rgba(255, 255, 255, 1)',
         pointBorderColor: 'rgba(16, 185, 129, 1)',
         pointBorderWidth: 3,
@@ -268,7 +275,7 @@ const Dashboard = () => {
         backgroundColor: 'rgba(239, 68, 68, 0.4)',
         borderWidth: 4,
         tension: 0.4,
-        fill: true, // Sử dụng fill, cần plugin Filler
+        fill: true,
         pointBackgroundColor: 'rgba(255, 255, 255, 1)',
         pointBorderColor: 'rgba(239, 68, 68, 1)',
         pointBorderWidth: 3,
@@ -309,24 +316,24 @@ const Dashboard = () => {
   // Dữ liệu biểu đồ Bar Chart (so sánh)
   const barChartData = compareData
     ? {
-        labels: [compareData.period1.label, compareData.period2.label],
-        datasets: [
-          {
-            label: 'Thu nhập',
-            data: [compareData.period1.income, compareData.period2.income],
-            backgroundColor: 'rgba(16, 185, 129, 0.7)',
-            borderColor: 'rgba(16, 185, 129, 1)',
-            borderWidth: 1,
-          },
-          {
-            label: 'Chi tiêu',
-            data: [compareData.period1.expenses, compareData.period2.expenses],
-            backgroundColor: 'rgba(239, 68, 68, 0.7)',
-            borderColor: 'rgba(239, 68, 68, 1)',
-            borderWidth: 1,
-          },
-        ],
-      }
+      labels: [compareData.period1.label, compareData.period2.label],
+      datasets: [
+        {
+          label: 'Thu nhập',
+          data: [compareData.period1.income, compareData.period2.income],
+          backgroundColor: 'rgba(16, 185, 129, 0.7)',
+          borderColor: 'rgba(16, 185, 129, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Chi tiêu',
+          data: [compareData.period1.expenses, compareData.period2.expenses],
+          backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          borderColor: 'rgba(239, 68, 68, 1)',
+          borderWidth: 1,
+        },
+      ],
+    }
     : null;
 
   // Tùy chọn biểu đồ

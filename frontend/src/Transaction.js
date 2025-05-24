@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Header from './Header';
 import Slider from './Slider';
-import { useNavigate } from 'react-router-dom'; // Thêm useNavigate
+import { useNavigate } from 'react-router-dom';
 
 // Cấu hình axios
 axios.defaults.baseURL = 'http://127.0.0.1:8000/api';
@@ -42,13 +42,18 @@ function Transaction() {
   });
   const [loi, setLoi] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate(); // Khởi tạo useNavigate
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+  const navigate = useNavigate();
 
   // Lấy danh sách danh mục
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('/categories');
+      const response = await axios.get('/categories', {
+        withCredentials: true,
+      });
       setCategories(response.data);
+      console.log('Danh mục:', response.data); // Debug danh mục
     } catch (error) {
       console.error('Lỗi khi lấy danh mục:', error);
       setLoi(error.response?.data?.error || 'Không thể tải danh sách danh mục');
@@ -63,7 +68,7 @@ function Transaction() {
       if (locDanhMuc !== 'Tất cả') params.danhMuc = locDanhMuc;
       if (locNgay) params.ngay = locNgay;
 
-      const response = await axios.get('/transactions', { params });
+      const response = await axios.get('/transactions', { params, withCredentials: true });
       setGiaoDich(response.data.map(item => ({
         ...item,
         category_color: item.category_color || '#000000',
@@ -113,20 +118,25 @@ function Transaction() {
 
     try {
       setLoading(true);
-      const response = await axios.post('/transactions', {
-        ten: formData.ten,
-        soTien: parseFloat(formData.soTien),
-        category_id: formData.category_id,
-        ngay: formData.ngay,
-        moTa: formData.moTa,
-      });
+      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
+      const response = await axios.post(
+        '/transactions',
+        {
+          ten: formData.ten,
+          soTien: parseFloat(formData.soTien),
+          category_id: parseInt(formData.category_id),
+          ngay: formData.ngay,
+          moTa: formData.moTa,
+        },
+        { withCredentials: true }
+      );
       setGiaoDich([...giaoDich, response.data]);
       alert('Giao dịch đã được thêm thành công!');
       setShowModal(false);
       setFormData({ ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
-      // Điều hướng về Dashboard với refresh=true
       navigate('/dashboard?refresh=true');
     } catch (error) {
+      console.log('Phản hồi lỗi:', error.response?.data);
       setLoi(error.response?.data?.error || 'Lỗi khi thêm giao dịch');
     } finally {
       setLoading(false);
@@ -158,20 +168,25 @@ function Transaction() {
 
     try {
       setLoading(true);
-      const response = await axios.put(`/transactions/${formDataEdit.id}`, {
-        ten: formDataEdit.ten,
-        soTien: parseFloat(formDataEdit.soTien),
-        category_id: formDataEdit.category_id,
-        ngay: formDataEdit.ngay,
-        moTa: formDataEdit.moTa,
-      });
+      await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
+      const response = await axios.put(
+        `/transactions/${formDataEdit.id}`,
+        {
+          ten: formDataEdit.ten,
+          soTien: parseFloat(formDataEdit.soTien),
+          category_id: parseInt(formDataEdit.category_id),
+          ngay: formDataEdit.ngay,
+          moTa: formDataEdit.moTa,
+        },
+        { withCredentials: true }
+      );
       setGiaoDich(giaoDich.map(gd => (gd.id === formDataEdit.id ? response.data : gd)));
       alert('Giao dịch đã được cập nhật!');
       setShowModalEdit(false);
       setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
-      // Điều hướng về Dashboard với refresh=true sau khi sửa
       navigate('/dashboard?refresh=true');
     } catch (error) {
+      console.log('Phản hồi lỗi:', error.response?.data);
       setLoi(error.response?.data?.error || 'Lỗi khi cập nhật giao dịch');
     } finally {
       setLoading(false);
@@ -182,12 +197,12 @@ function Transaction() {
     if (window.confirm('Bạn có chắc chắn muốn xóa giao dịch này không?')) {
       try {
         setLoading(true);
-        await axios.delete(`/transactions/${id}`);
+        await axios.delete(`/transactions/${id}`, { withCredentials: true });
         setGiaoDich(giaoDich.filter(gd => gd.id !== id));
         alert('Giao dịch đã được xóa!');
-        // Điều hướng về Dashboard với refresh=true sau khi xóa
         navigate('/dashboard?refresh=true');
       } catch (error) {
+        console.log('Phản hồi lỗi:', error.response?.data);
         setLoi(error.response?.data?.error || 'Lỗi khi xóa giao dịch');
       } finally {
         setLoading(false);
@@ -202,7 +217,7 @@ function Transaction() {
         setSelectedTransaction(existingTransaction);
         setShowModalDetail(true);
       } else {
-        const response = await axios.get(`/transactions/${id}`);
+        const response = await axios.get(`/transactions/${id}`, { withCredentials: true });
         setSelectedTransaction({
           ...response.data,
           category_name: response.data.category_name || 'Không xác định',
@@ -212,6 +227,7 @@ function Transaction() {
         setShowModalDetail(true);
       }
     } catch (error) {
+      console.log('Phản hồi lỗi:', error.response?.data);
       setLoi(error.response?.data?.error || 'Lỗi khi xem chi tiết giao dịch');
     }
   };
@@ -238,16 +254,25 @@ function Transaction() {
     const { name, value } = e.target;
     if (name === 'locDanhMuc') setLocDanhMuc(value);
     if (name === 'locNgay') setLocNgay(value);
+    setCurrentPage(1); // Reset về trang đầu khi thay đổi bộ lọc
+  };
+
+  // Phân trang
+  const totalItems = giaoDich.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = giaoDich.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>
-      {/* Sidebar cố định với chiều rộng 245px */}
       <div style={{ width: '245px', backgroundColor: '#f8f9fa' }}>
         <Slider />
       </div>
-
-      {/* Phần nội dung chính */}
       <div className="flex-grow-1">
         <Header />
         <div className="p-4">
@@ -260,8 +285,6 @@ function Transaction() {
                 </div>
               )}
               {loi && <div className="alert alert-danger">{loi}</div>}
-
-              {/* Phần Lọc */}
               <div className="card mb-4 shadow-sm border-0">
                 <div className="card-body">
                   <div className="row g-3">
@@ -294,6 +317,7 @@ function Transaction() {
                         value={locNgay}
                         onChange={handleFilterChange}
                         className="form-control"
+                        max="2025-05-24"
                       />
                     </div>
                     <div className="col-md-4 d-flex align-items-end">
@@ -308,8 +332,6 @@ function Transaction() {
                   </div>
                 </div>
               </div>
-
-              {/* Danh sách Giao dịch */}
               <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                   <div className="table-responsive">
@@ -324,7 +346,7 @@ function Transaction() {
                         </tr>
                       </thead>
                       <tbody>
-                        {giaoDich.map(gd => (
+                        {paginatedTransactions.map(gd => (
                           <tr key={gd.id}>
                             <td>{gd.ten}</td>
                             <td className={gd.soTien >= 0 ? 'text-success' : 'text-danger'}>
@@ -371,10 +393,48 @@ function Transaction() {
                       </tbody>
                     </table>
                   </div>
+                  {totalPages > 1 && (
+                    <nav className="mt-3">
+                      <ul className="pagination justify-content-center">
+                        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                          <button
+                            className="page-link"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                          >
+                            Trước
+                          </button>
+                        </li>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <li
+                            key={page}
+                            className={`page-item ${currentPage === page ? 'active' : ''}`}
+                          >
+                            <button
+                              className="page-link"
+                              onClick={() => handlePageChange(page)}
+                            >
+                              {page}
+                            </button>
+                          </li>
+                        ))}
+                        <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                          <button
+                            className="page-link"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                          >
+                            Sau
+                          </button>
+                        </li>
+                      </ul>
+                      <div className="text-center">
+                        Trang {currentPage} / {totalPages}
+                      </div>
+                    </nav>
+                  )}
                 </div>
               </div>
-
-              {/* Modal Thêm Giao dịch */}
               <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                   <div className="modal-content">
@@ -443,6 +503,7 @@ function Transaction() {
                             name="ngay"
                             value={formData.ngay}
                             onChange={handleChange}
+                            max="2025-05-24"
                           />
                         </div>
                         <div className="mb-3">
@@ -476,8 +537,6 @@ function Transaction() {
                   </div>
                 </div>
               </div>
-
-              {/* Modal Sửa Giao dịch */}
               <div className={`modal fade ${showModalEdit ? 'show d-block' : ''}`} tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                   <div className="modal-content">
@@ -546,6 +605,7 @@ function Transaction() {
                             name="ngay"
                             value={formDataEdit.ngay}
                             onChange={(e) => handleChange(e, true)}
+                            max="2025-05-24"
                           />
                         </div>
                         <div className="mb-3">
@@ -579,8 +639,6 @@ function Transaction() {
                   </div>
                 </div>
               </div>
-
-              {/* Modal Xem Chi Tiết Giao Dịch */}
               <div className={`modal fade ${showModalDetail ? 'show d-block' : ''}`} tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                   <div className="modal-content">

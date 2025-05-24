@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import FlashMessage from './FlashMessage';
-import Header from './Header'; // Thêm import Header
-import Slider from './Slider'; // Thêm import Slider
+import Header from './Header';
+import Slider from './Slider';
 
 const EditProfile = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +18,8 @@ const EditProfile = () => {
   const [userId, setUserId] = useState(null);
   const [errors, setErrors] = useState({});
   const [flashMessage, setFlashMessage] = useState({ type: '', message: '' });
+  const [imageError, setImageError] = useState(false); // Theo dõi lỗi tải ảnh
+  const [showConfirm, setShowConfirm] = useState(false); // State cho modal xác nhận
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,7 +48,7 @@ const EditProfile = () => {
           phone: user.phone || '',
           city: user.city || '',
           bio: user.bio || '',
-          avatar: null,
+          avatar: user.avatar || null,
         });
       } catch (error) {
         console.error('Fetch user error:', error.response ? error.response.data : error.message);
@@ -63,17 +65,30 @@ const EditProfile = () => {
       ...prev,
       [name]: files ? files[0] : value,
     }));
-    console.log(`Updated ${name}:`, files ? files[0] : value); // Debug giá trị
+    console.log(`Updated ${name}:`, files ? files[0] : value);
     setErrors((prevErrors) => {
       const newErrors = { ...prevErrors };
       delete newErrors[name];
       return newErrors;
     });
+    if (name === 'avatar' && files) {
+      setImageError(false); // Reset lỗi khi chọn ảnh mới
+    }
   }, []);
 
+  const handleConfirmSubmit = (e) => {
+    e.preventDefault();
+    setShowConfirm(true); // Hiển thị modal xác nhận
+  };
+
   const handleSubmit = useCallback(
-    async (e) => {
-      e.preventDefault();
+    async (confirmed) => {
+      if (!confirmed) {
+        setShowConfirm(false); // Đóng modal nếu không xác nhận
+        return;
+      }
+
+      setShowConfirm(false); // Đóng modal sau khi xác nhận
       setErrors(null);
 
       try {
@@ -83,17 +98,16 @@ const EditProfile = () => {
         }
 
         const formDataToSend = new FormData();
-        // Chỉ gửi các trường đã thay đổi hoặc có giá trị mới, không bắt buộc
         if (formData.username !== '') formDataToSend.append('username', formData.username);
         if (formData.email !== '') formDataToSend.append('email', formData.email);
         if (formData.phone !== '') formDataToSend.append('phone', formData.phone);
         if (formData.city !== '') formDataToSend.append('city', formData.city);
         if (formData.bio !== '') formDataToSend.append('bio', formData.bio);
-        if (formData.avatar) {
-          console.log('Avatar:', formData.avatar); // Debug file
+        if (formData.avatar instanceof File) {
+          console.log('Avatar:', formData.avatar);
           formDataToSend.append('avatar', formData.avatar);
         }
-        formDataToSend.append('_method', 'PUT'); // Giả lập PUT nếu cần
+        formDataToSend.append('_method', 'PUT');
 
         const config = {
           withCredentials: true,
@@ -104,7 +118,7 @@ const EditProfile = () => {
         };
 
         console.log('Gửi yêu cầu: PUT /api/update/' + userId);
-        console.log('FormData:', [...formDataToSend.entries()]); // Debug FormData
+        console.log('FormData:', [...formDataToSend.entries()]);
         const response = await axios.post(`http://127.0.0.1:8000/api/update/${userId}`, formDataToSend, config);
 
         console.log('Phản hồi:', response.data);
@@ -114,7 +128,7 @@ const EditProfile = () => {
       } catch (error) {
         console.error('Update profile error:', error.response ? error.response.data : error.message);
         if (error.response && error.response.data && error.response.data.errors) {
-          console.log('Chi tiết lỗi:', error.response.data.errors); // Debug lỗi 422
+          console.log('Chi tiết lỗi:', error.response.data.errors);
           setErrors(error.response.data.errors);
           setFlashMessage({ type: 'error', message: 'Vui lòng kiểm tra các trường nhập.' });
         } else {
@@ -127,12 +141,9 @@ const EditProfile = () => {
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>
-      {/* Sidebar cố định với chiều rộng 245px */}
       <div style={{ width: '245px', backgroundColor: '#f8f9fa' }}>
         <Slider />
       </div>
-
-      {/* Phần nội dung chính */}
       <div className="flex-grow-1">
         <Header />
         <div className="p-4">
@@ -155,7 +166,7 @@ const EditProfile = () => {
                     ))}
                   </div>
                 )}
-                <form onSubmit={handleSubmit} noValidate>
+                <form onSubmit={handleConfirmSubmit} noValidate>
                   <div className="mb-3">
                     <label htmlFor="username" className="form-label">Tên người dùng:</label>
                     <input
@@ -221,6 +232,20 @@ const EditProfile = () => {
                   </div>
                   <div className="mb-3">
                     <label htmlFor="avatar" className="form-label">Ảnh đại diện:</label>
+                    {formData.avatar && typeof formData.avatar === 'string' && formData.avatar.trim() !== '' && !imageError ? (
+                      <div className="mb-2">
+                        <img
+                          src={`http://127.0.0.1:8000/storage/avatars/${formData.avatar}`}
+                          alt="Avatar hiện tại"
+                          className="img-fluid rounded"
+                          style={{ maxWidth: '150px', maxHeight: '150px', border: '2px solid #e9ecef' }}
+                          onError={() => setImageError(true)}
+                        />
+                        {!imageError && <p className="text-muted mt-1">Tên ảnh: {formData.avatar}</p>}
+                      </div>
+                    ) : (
+                      <p className="text-muted mb-2">Chưa có ảnh đại diện.</p>
+                    )}
                     <input
                       type="file"
                       className="form-control"
@@ -234,6 +259,31 @@ const EditProfile = () => {
                 </form>
               </div>
             </div>
+
+            {/* Modal xác nhận */}
+            {showConfirm && (
+              <div className="modal" tabIndex="-1" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                <div className="modal-dialog">
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h5 className="modal-title">Xác nhận cập nhật</h5>
+                      <button type="button" className="btn-close" onClick={() => setShowConfirm(false)}></button>
+                    </div>
+                    <div className="modal-body">
+                      <p>Bạn có chắc muốn cập nhật thông tin hồ sơ không?</p>
+                    </div>
+                    <div className="modal-footer">
+                      <button type="button" className="btn btn-secondary" onClick={() => setShowConfirm(false)}>
+                        Hủy
+                      </button>
+                      <button type="button" className="btn btn-primary" onClick={() => handleSubmit(true)}>
+                        Xác nhận
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

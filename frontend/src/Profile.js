@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import FlashMessage from './FlashMessage';
-import Header from './Header'; // Thêm import Header
-import Slider from './Slider'; // Thêm import Slider
+import Header from './Header';
+import Slider from './Slider';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -14,20 +14,17 @@ const Profile = () => {
   useEffect(() => {
     const controller = new AbortController();
 
-    // Kiểm tra xem dữ liệu user đã được lưu trong localStorage chưa
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        return; // Nếu đã có dữ liệu user, không gọi API
       } catch (error) {
         console.error('Error parsing stored user:', error);
-        localStorage.removeItem('user'); // Xóa dữ liệu nếu không hợp lệ
+        localStorage.removeItem('user');
       }
     }
 
-    // Nếu không có dữ liệu trong localStorage, kiểm tra token và gọi API
     const checkAuth = () => {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -56,21 +53,33 @@ const Profile = () => {
           ...config,
           signal: controller.signal,
         });
-        console.log('User data:', response.data);
-        setUser(response.data);
-        // Lưu dữ liệu user vào localStorage để dùng lại
-        localStorage.setItem('user', JSON.stringify(response.data));
+        const data = response.data;
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          console.log('User data:', data);
+          setUser(data);
+          localStorage.setItem('user', JSON.stringify(data));
+        } else {
+          throw new Error('Dữ liệu từ API trống hoặc không hợp lệ.');
+        }
       } catch (error) {
         if (error.name === 'AbortError') {
           console.log('Request aborted');
-        } else if (error.response?.status === 401) {
+        } else if (error.response && error.response.status === 401) {
+          console.log('Unauthorized error:', error.response.data);
           setFlashMessage({ type: 'error', message: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' });
-          localStorage.removeItem('user'); // Xóa dữ liệu user nếu token không hợp lệ
-          localStorage.removeItem('token'); // Xóa token
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
           setTimeout(() => navigate('/login'), 3000);
-        } else {
-          console.log('Fetch user error:', error.response?.status, error.response?.data || error.message);
-          setFlashMessage({ type: 'error', message: 'Có lỗi xảy ra khi lấy thông tin hồ sơ.' });
+        } else if (!storedUser) {
+          console.log('Fetch user error:', {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message,
+          });
+          setFlashMessage({
+            type: 'error',
+            message: error.response?.data?.message || error.message || 'Có lỗi xảy ra khi lấy thông tin hồ sơ.',
+          });
         }
       } finally {
         setIsFetching(false);
@@ -84,11 +93,11 @@ const Profile = () => {
     };
   }, [navigate]);
 
-  if (!user) return null;
+  if (!user || (Object.keys(user).length === 0 && !localStorage.getItem('user'))) return null;
 
   const avatarUrl =
-    user.avatar && user.avatar !== 'null' && user.avatar !== 'undefined'
-      ? `http://localhost:8000/storage/avatars/${user.avatar}?t=${Date.now()}`
+    user.avatar && typeof user.avatar === 'string' && user.avatar.trim() !== ''
+      ? `http://localhost:8000/storage/avatars/${user.avatar}`
       : 'http://localhost:8000/storage/avatars/default.png';
 
   const formattedRole = user.role
@@ -97,12 +106,9 @@ const Profile = () => {
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>
-      {/* Sidebar cố định với chiều rộng 245px */}
       <div style={{ width: '245px', backgroundColor: '#f8f9fa' }}>
         <Slider />
       </div>
-
-      {/* Phần nội dung chính */}
       <div className="flex-grow-1">
         <Header />
         <div className="p-4">
@@ -129,7 +135,11 @@ const Profile = () => {
                       alt="Avatar"
                       className="img-fluid rounded-circle mb-3"
                       style={{ maxWidth: '150px', height: 'auto', border: '2px solid #e9ecef' }}
-                      onError={(e) => (e.target.src = 'http://localhost:8000/storage/avatars/default.png')}
+                      onError={(e) => {
+                        if (e.target.src !== 'http://localhost:8000/storage/avatars/default.png') {
+                          e.target.src = 'http://localhost:8000/storage/avatars/default.png';
+                        }
+                      }}
                     />
                   </div>
                   <div className="col-md-9">

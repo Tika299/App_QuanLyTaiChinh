@@ -4,6 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import Chart from 'react-apexcharts';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Slider from './Slider';
 import Header from './Header';
 
@@ -45,8 +46,10 @@ function Home() {
         labels: [],
     });
     const [timeFrame, setTimeFrame] = useState('week');
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    // Cấu hình biểu đồ ApexCharts để giống với Dashboard
+    // Cấu hình biểu đồ ApexCharts
     const chartOptions = {
         chart: {
             height: 400,
@@ -166,13 +169,11 @@ function Home() {
     // Lấy dữ liệu từ API
     const fetchFinanceData = async (frame) => {
         try {
-            await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
-                withCredentials: true,
-            });
+            await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
             const token = localStorage.getItem('token');
             if (!token) {
                 toast.error('Vui lòng đăng nhập lại.');
-                window.location.href = '/';
+                navigate('/login');
                 return;
             }
 
@@ -228,9 +229,19 @@ function Home() {
         }
     };
 
+    // Fetch data on mount and when timeFrame changes
     useEffect(() => {
         fetchFinanceData(timeFrame);
-    }, [timeFrame]);
+    }, [timeFrame, navigate]);
+
+    // Handle refresh query parameter
+    useEffect(() => {
+        const query = new URLSearchParams(location.search);
+        if (query.get('refresh') === 'true') {
+            fetchFinanceData(timeFrame);
+            navigate('/Home', { replace: true }); // Clear query parameter
+        }
+    }, [location.search, timeFrame, navigate]);
 
     const handleFilter = (frame) => {
         setTimeFrame(frame);
