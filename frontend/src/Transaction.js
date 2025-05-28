@@ -17,6 +17,7 @@ axios.interceptors.request.use(config => {
 });
 
 function Transaction() {
+  const today = new Date().toISOString().split('T')[0];
   const [giaoDich, setGiaoDich] = useState([]);
   const [locDanhMuc, setLocDanhMuc] = useState('Tất cả');
   const [locNgay, setLocNgay] = useState('');
@@ -53,7 +54,6 @@ function Transaction() {
         withCredentials: true,
       });
       setCategories(response.data);
-      console.log('Danh mục:', response.data); // Debug danh mục
     } catch (error) {
       console.error('Lỗi khi lấy danh mục:', error);
       setLoi(error.response?.data?.error || 'Không thể tải danh sách danh mục');
@@ -125,7 +125,7 @@ function Transaction() {
           ten: formData.ten,
           soTien: parseFloat(formData.soTien),
           category_id: parseInt(formData.category_id),
-          ngay: formData.ngay,
+          ngay: toInputDateFormat(formData.ngay), // chuyển về YYYY-MM-DD
           moTa: formData.moTa,
         },
         { withCredentials: true }
@@ -151,7 +151,7 @@ function Transaction() {
         ten: transaction.ten,
         soTien: transaction.soTien,
         category_id: transaction.category_id,
-        ngay: transaction.ngay,
+        ngay: toInputDateFormat(transaction.ngay), // chuyển về YYYY-MM-DD cho input
         moTa: transaction.moTa,
       });
       setShowModalEdit(true);
@@ -166,6 +166,13 @@ function Transaction() {
       return;
     }
 
+    // Thêm dòng này để debug giá trị gửi lên
+    console.log('Dữ liệu gửi lên:', {
+      ...formDataEdit,
+      soTien: parseFloat(formDataEdit.soTien),
+      category_id: parseInt(formDataEdit.category_id),
+    });
+
     try {
       setLoading(true);
       await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
@@ -175,7 +182,7 @@ function Transaction() {
           ten: formDataEdit.ten,
           soTien: parseFloat(formDataEdit.soTien),
           category_id: parseInt(formDataEdit.category_id),
-          ngay: formDataEdit.ngay,
+          ngay: toInputDateFormat(formDataEdit.ngay), // chuyển về YYYY-MM-DD
           moTa: formDataEdit.moTa,
         },
         { withCredentials: true }
@@ -317,7 +324,7 @@ function Transaction() {
                         value={locNgay}
                         onChange={handleFilterChange}
                         className="form-control"
-                        max="2025-05-24"
+                        max={today}
                       />
                     </div>
                     <div className="col-md-4 d-flex align-items-end">
@@ -349,7 +356,7 @@ function Transaction() {
                         {paginatedTransactions.map(gd => (
                           <tr key={gd.id}>
                             <td>{gd.ten}</td>
-                            <td className={gd.soTien >= 0 ? 'text-success' : 'text-danger'}>
+                            <td className={gd.danhMuc === "Thu nhập" ? 'text-success' : 'text-danger'}>
                               {Math.abs(gd.soTien).toLocaleString('vi-VN')} VNĐ
                             </td>
                             <td>
@@ -503,7 +510,7 @@ function Transaction() {
                             name="ngay"
                             value={formData.ngay}
                             onChange={handleChange}
-                            max="2025-05-24"
+                            max={today}
                           />
                         </div>
                         <div className="mb-3">
@@ -605,7 +612,7 @@ function Transaction() {
                             name="ngay"
                             value={formDataEdit.ngay}
                             onChange={(e) => handleChange(e, true)}
-                            max="2025-05-24"
+                            max={today}
                           />
                         </div>
                         <div className="mb-3">
@@ -712,6 +719,22 @@ function Transaction() {
       </div>
     </div>
   );
+}
+
+function toInputDateFormat(dateStr) {
+  // Chuyển DD/MM/YYYY => YYYY-MM-DD
+  if (!dateStr) return '';
+  const [day, month, year] = dateStr.split('/');
+  if (!year) return dateStr; // Nếu đã là YYYY-MM-DD thì trả về luôn
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function toDisplayDateFormat(dateStr) {
+  // Chuyển YYYY-MM-DD => DD/MM/YYYY
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  if (!day) return dateStr; // Nếu đã là DD/MM/YYYY thì trả về luôn
+  return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
 }
 
 export default Transaction;

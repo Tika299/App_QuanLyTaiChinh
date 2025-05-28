@@ -1,8 +1,7 @@
 services:
-  # Frontend service (ReactJS)
   frontend:
     build:
-      context: D:/APP_QUANLYTAICHINH/frontend
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
@@ -11,10 +10,9 @@ services:
     depends_on:
       - backend
 
-  # Backend service (Laravel)
   backend:
     build:
-      context: D:/APP_QUANLYTAICHINH/backend
+      context: ./backend
       dockerfile: Dockerfile
     depends_on:
       - db
@@ -27,7 +25,6 @@ services:
       - DB_USERNAME=laravel_user
       - DB_PASSWORD=laravel_password
 
-  # Web server (Nginx)
   nginx:
     build:
       context: .
@@ -35,12 +32,11 @@ services:
     ports:
       - "80:80"
     volumes:
-      - D:/App_QuanLyTaiChinh/backend:/var/www
+      - ./backend:/var/www
     depends_on:
       - backend
       - frontend
 
-  # Database service (MySQL)
   db:
     image: mysql:8.0
     environment:

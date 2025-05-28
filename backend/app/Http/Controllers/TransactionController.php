@@ -154,7 +154,7 @@ class TransactionController extends Controller
                 return response()->json(['error' => $validator->errors()->first()], 422);
             }
 
-            $userId = auth()->$id(); // TODO: Thay bằng auth()->id() trong môi trường thực tế
+            $userId = auth()->id(); // TODO: Thay bằng auth()->id() trong môi trường thực tế
             $category = Category::where('user_id', $userId)
                 ->findOrFail($request->category_id);
 
