@@ -1,6 +1,20 @@
 import React from 'react';
 
 const GoalList = ({ goals, categories, currentPage, totalPages, setCurrentPage }) => {
+  // Hàm để chuyển contribution_period thành tiếng Việt
+  const formatContributionPeriod = (period) => {
+    switch (period) {
+      case 'daily':
+        return 'Hàng Ngày';
+      case 'weekly':
+        return 'Hàng Tuần';
+      case 'monthly':
+        return 'Hàng Tháng';
+      default:
+        return 'Không xác định';
+    }
+  };
+
   return (
     <div>
       <h3>Danh Sách Mục Tiêu</h3>
@@ -10,8 +24,8 @@ const GoalList = ({ goals, categories, currentPage, totalPages, setCurrentPage }
             <th>Tên</th>
             <th>Danh Mục</th>
             <th>Số Tiền</th>
-            <th>Kỳ Góp</th> 
-            <th>Hạn Cuối</th> 
+            <th>Kỳ Góp</th>
+            <th>Hạn Cuối</th>
             <th>Ghi Chú</th>
           </tr>
         </thead>
@@ -22,22 +36,18 @@ const GoalList = ({ goals, categories, currentPage, totalPages, setCurrentPage }
                 <td>{goal.name}</td>
                 <td>{categories.find(cat => cat.id === goal.category_id)?.name || 'Không có danh mục'}</td>
                 <td>{new Intl.NumberFormat('vi-VN').format(parseFloat(goal.target_amount))}</td>
-                <td>
-                  {goal.due_date
-                    ? new Date(goal.due_date.includes('T') ? goal.due_date.split('T')[0] : goal.due_date).toLocaleDateString('vi-VN')
-                    : 'Không có hạn'}
-                </td>
+                <td>{formatContributionPeriod(goal.contribution_period)}</td>
                 <td>
                   {goal.deadline
                     ? new Date(goal.deadline.includes('T') ? goal.deadline.split('T')[0] : goal.deadline).toLocaleDateString('vi-VN')
                     : 'Không có hạn cuối'}
-                </td> 
+                </td>
                 <td>{goal.note || 'Không có ghi chú'}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="7" className="text-center">
+              <td colSpan="6" className="text-center">
                 Chưa có mục tiêu nào.
               </td>
             </tr>

@@ -89,7 +89,7 @@ function Slider() {
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#table" />
                         </svg>
-                        Orders
+                        Transactions
                     </Link>
                 </li>
                 <li>
@@ -97,17 +97,10 @@ function Slider() {
                         <svg className="bi me-2" width={16} height={16}>
                             <use xlinkHref="#grid" />
                         </svg>
-                        Products
+                        Goals
                     </Link>
                 </li>
-                <li>
-                    <Link to="/products" className={isActive("/products")}>
-                        <svg className="bi me-2" width={16} height={16}>
-                            <use xlinkHref="#people-circle" />
-                        </svg>
-                        Customers
-                    </Link>
-                </li>
+               
             </ul>
             <hr />
             <div className="dropdown">
@@ -131,9 +124,7 @@ function Slider() {
                     className="dropdown-menu dropdown-menu-dark text-small shadow"
                     aria-labelledby="dropdownUser1"
                 >
-                    <li>
-                        <Link className="dropdown-item" to="/new-project">New project...</Link>
-                    </li>
+                  
                     <li>
                         <Link className="dropdown-item" to="/settings">Settings</Link>
                     </li>

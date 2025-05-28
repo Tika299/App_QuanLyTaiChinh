@@ -16,18 +16,20 @@ const Goals = () => {
     name: '',
     target_amount: '',
     contribution_period: '',
-    contribution_type: '', // Add this
-    deadline: '',        // Add this
+    contribution_type: '',
+    deadline: '',
     category_id: '',
+    note: '',
   });
   const [editFormData, setEditFormData] = useState({
     goal_id: '',
     name: '',
     target_amount: '',
     contribution_period: '',
-    contribution_type: '', // Add this
-    deadline: '',        // Add this
+    contribution_type: '',
+    deadline: '',
     category_id: '',
+    note: '',
   });
   const [deleteGoalId, setDeleteGoalId] = useState('');
   const [errors, setErrors] = useState({});
@@ -91,6 +93,10 @@ const Goals = () => {
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
+    // Confirm before adding
+    if (!window.confirm('Bạn có muốn thêm mục tiêu này không?')) {
+      return;
+    }
     try {
       await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
@@ -105,8 +111,9 @@ const Goals = () => {
         target_amount: parseFloat(addFormData.target_amount),
         contribution_period: addFormData.contribution_period,
         contribution_type: addFormData.contribution_type,
-        deadline: addFormData.deadline || null, // Send null if empty
+        deadline: addFormData.deadline || null,
         category_id: parseInt(addFormData.category_id),
+        note: addFormData.note || null,
       };
 
       // Client-side validation
@@ -117,7 +124,7 @@ const Goals = () => {
         !payload.contribution_type ||
         isNaN(payload.category_id)
       ) {
-        setFlashMessage({ type: 'error', message: 'Vui lòng điền đầy đủ và đúng định dạng tất cả các trường.' });
+        setFlashMessage({ type: 'error', message: 'Vui lòng điền đầy đủ và đúng định dạng tất cả các trường bắt buộc.' });
         return;
       }
 
@@ -137,6 +144,7 @@ const Goals = () => {
         contribution_type: '',
         deadline: '',
         category_id: '',
+        note: '',
       });
       setErrors({});
     } catch (error) {
@@ -169,6 +177,7 @@ const Goals = () => {
         contribution_type: goal.contribution_type || '',
         deadline: goal.deadline || '',
         category_id: goal.category?.id || '',
+        note: goal.note || '',
       });
     }
   };
@@ -181,6 +190,10 @@ const Goals = () => {
     e.preventDefault();
     if (!editFormData.goal_id) {
       setFlashMessage({ type: 'error', message: 'Vui lòng chọn mục tiêu để sửa.' });
+      return;
+    }
+    // Confirm before editing
+    if (!window.confirm('Bạn có muốn sửa mục tiêu này không?')) {
       return;
     }
     try {
@@ -199,6 +212,7 @@ const Goals = () => {
         contribution_type: editFormData.contribution_type,
         deadline: editFormData.deadline || null,
         category_id: parseInt(editFormData.category_id),
+        note: editFormData.note || null,
       };
 
       await axios.put(`http://localhost:8000/api/goals/${editFormData.goal_id}`, payload, {
@@ -216,6 +230,7 @@ const Goals = () => {
         contribution_type: '',
         deadline: '',
         category_id: '',
+        note: '',
       });
       setErrors({});
     } catch (error) {
@@ -313,6 +328,7 @@ const Goals = () => {
                 value={addFormData.name}
                 onChange={handleAddChange}
                 className="form-control"
+                placeholder="Ví dụ: Mua xe, Du lịch,..."
                 required
               />
               {errors.name && <span className="text-danger">{errors.name[0]}</span>}
@@ -326,6 +342,7 @@ const Goals = () => {
                 value={addFormData.target_amount}
                 onChange={handleAddChange}
                 className="form-control"
+                placeholder="Ví dụ: 10000000"
                 required
               />
               {errors.target_amount && <span className="text-danger">{errors.target_amount[0]}</span>}
@@ -358,8 +375,8 @@ const Goals = () => {
                 required
               >
                 <option value="">-- Chọn Loại Kỳ Góp --</option>
-                <option value="fixed">Cố Định</option>
-                <option value="flexible">Linh Hoạt</option>
+                <option value="fixed">Tiền Mặt</option>
+                <option value="flexible">Ngân Hàng</option>
               </select>
               {errors.contribution_type && <span className="text-danger">{errors.contribution_type[0]}</span>}
             </div>
@@ -394,6 +411,19 @@ const Goals = () => {
               </select>
               {errors.category_id && <span className="text-danger">{errors.category_id[0]}</span>}
             </div>
+            <div className="mb-3">
+              <label htmlFor="note" className="form-label">Ghi Chú:</label>
+              <textarea
+                name="note"
+                id="note"
+                value={addFormData.note}
+                onChange={handleAddChange}
+                className="form-control"
+                rows="3"
+                placeholder="Ví dụ: Ghi chú về kế hoạch tiết kiệm..."
+              />
+              {errors.note && <span className="text-danger">{errors.note[0]}</span>}
+            </div>
             <button type="submit" className="btn btn-primary mt-2">Lưu</button>
           </form>
 
@@ -427,6 +457,7 @@ const Goals = () => {
                 value={editFormData.name}
                 onChange={handleEditChange}
                 className="form-control"
+                placeholder="Ví dụ: Mua xe, Du lịch,..."
                 required
               />
               {errors.name && <span className="text-danger">{errors.name[0]}</span>}
@@ -440,6 +471,7 @@ const Goals = () => {
                 value={editFormData.target_amount}
                 onChange={handleEditChange}
                 className="form-control"
+                placeholder="Ví dụ: 10000000"
                 required
               />
               {errors.target_amount && <span className="text-danger">{errors.target_amount[0]}</span>}
@@ -472,8 +504,8 @@ const Goals = () => {
                 required
               >
                 <option value="">-- Chọn Loại Kỳ Góp --</option>
-                <option value="fixed">Cố Định</option>
-                <option value="flexible">Linh Hoạt</option>
+                <option value="fixed">Tiền Mặt</option>
+                <option value="flexible">Ngân Hàng</option>
               </select>
               {errors.contribution_type && <span className="text-danger">{errors.contribution_type[0]}</span>}
             </div>
@@ -508,11 +540,24 @@ const Goals = () => {
               </select>
               {errors.category_id && <span className="text-danger">{errors.category_id[0]}</span>}
             </div>
+            <div className="mb-3">
+              <label htmlFor="edit_note" className="form-label">Ghi Chú:</label>
+              <textarea
+                name="note"
+                id="edit_note"
+                value={editFormData.note}
+                onChange={handleEditChange}
+                className="form-control"
+                rows="3"
+                placeholder="Ví dụ: Ghi chú về kế hoạch tiết kiệm..."
+              />
+              {errors.note && <span className="text-danger">{errors.note[0]}</span>}
+            </div>
             <button type="submit" className="btn btn-warning mt-2">Cập Nhật</button>
           </form>
 
           <form onSubmit={handleDeleteSubmit} id="deleteForm" style={{ display: activeForm === 'deleteForm' ? 'block' : 'none' }}>
-            <h4>Xóa Mục Tiêu</h4>
+            <h4>Xóa MĐích Tiêu</h4>
             <div className="mb-3">
               <label htmlFor="delete_goal_id" className="form-label">Chọn Mục Tiêu Cần Xóa:</label>
               <select
@@ -524,7 +569,6 @@ const Goals = () => {
                 required
               >
                 <option value="">-- Chọn Mục Tiêu --</option>
-                <option value="all">Xóa Tất Cả</option>
                 {goals.map(goal => (
                   <option key={goal.id} value={goal.id}>
                     {goal.name} (Danh mục: {goal.category?.name || 'Không có'} - {goal.category?.type === 'income' ? 'Thu' : 'Chi'})

@@ -159,13 +159,7 @@ const EditProfile = () => {
                 <h5 className="mb-0">Cập Nhật Thông Tin</h5>
               </div>
               <div className="card-body">
-                {errors && (
-                  <div className="alert alert-danger mb-3">
-                    {Object.values(errors).flat().map((error, index) => (
-                      <div key={index}>{error}</div>
-                    ))}
-                  </div>
-                )}
+              
                 <form onSubmit={handleConfirmSubmit} noValidate>
                   <div className="mb-3">
                     <label htmlFor="username" className="form-label">Tên người dùng:</label>

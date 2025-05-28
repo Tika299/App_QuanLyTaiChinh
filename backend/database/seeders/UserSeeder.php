@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class UserSeeder extends Seeder
 {
-    const MAX_RECORDS = 10; // 1 admin + 9 user
+    const MAX_RECORDS = 1000; // 1 admin + 9 user
 
     public function run(): void
     {

@@ -15,6 +15,7 @@ class Goal extends Model
         'contribution_period',
         'contribution_type', // Add this
         'deadline',        // Add this
+        'note',
     ];
 
     public function user()

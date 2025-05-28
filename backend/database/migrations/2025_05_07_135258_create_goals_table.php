@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->string('contribution_period');
             $table->enum('contribution_type', ['fixed', 'flexible']);
             $table->date('deadline')->nullable();
+            $table->text('note')->nullable();
             $table->timestamps();
         });
 

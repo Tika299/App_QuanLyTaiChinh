@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify'; // Đã thêm ToastContainer vào import
+import 'react-toastify/dist/ReactToastify.css'; // Import CSS cho Toastify
 
 const ViewModal = ({ selectedUser }) => {
   const getAvatarUrl = useCallback((avatar) => {
@@ -25,13 +27,13 @@ const ViewModal = ({ selectedUser }) => {
             {selectedUser ? (
               <div>
                 <p><strong>ID:</strong> {selectedUser.id}</p>
-                <p><strong>Tên người dùng:</strong> {selectedUser.username}</p>
-                <p><strong>Email:</strong> {selectedUser.email}</p>
+                <p><strong>Tên người dùng:</strong> {selectedUser.username || 'N/A'}</p>
+                <p><strong>Email:</strong> {selectedUser.email || 'N/A'}</p>
                 <p><strong>Vai trò:</strong> {selectedUser.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}</p>
                 <p><strong>Avatar:</strong></p>
                 <img
                   src={getAvatarUrl(selectedUser.avatar)}
-                  alt={selectedUser.username}
+                  alt={selectedUser.username || 'Avatar'}
                   className="img-fluid"
                   style={{ maxWidth: '100px' }}
                 />
@@ -72,10 +74,10 @@ const EditModal = ({ editForm, handleEditChange, handleEditSubmit, errors }) => 
               <label htmlFor="editUsername" className="form-label">Tên người dùng</label>
               <input
                 type="text"
-                className="form-control"
+                className={`form-control ${errors?.username ? 'is-invalid' : ''}`}
                 id="editUsername"
                 name="username"
-                value={editForm.username}
+                value={editForm.username || ''}
                 onChange={handleEditChange}
                 required
               />
@@ -84,10 +86,10 @@ const EditModal = ({ editForm, handleEditChange, handleEditSubmit, errors }) => 
               <label htmlFor="editEmail" className="form-label">Email</label>
               <input
                 type="email"
-                className="form-control"
+                className={`form-control ${errors?.email ? 'is-invalid' : ''}`}
                 id="editEmail"
                 name="email"
-                value={editForm.email}
+                value={editForm.email || ''}
                 onChange={handleEditChange}
                 required
               />
@@ -95,10 +97,10 @@ const EditModal = ({ editForm, handleEditChange, handleEditSubmit, errors }) => 
             <div className="mb-3">
               <label htmlFor="editRole" className="form-label">Vai trò</label>
               <select
-                className="form-select"
+                className={`form-select ${errors?.role ? 'is-invalid' : ''}`}
                 id="editRole"
                 name="role"
-                value={editForm.role}
+                value={editForm.role || 'member'}
                 onChange={handleEditChange}
                 required
               >
@@ -136,7 +138,7 @@ const UserList = () => {
     id: '',
     username: '',
     email: '',
-    role: 'user',
+    role: 'member',
     avatar: null,
   });
   const [editErrors, setEditErrors] = useState(null);
@@ -147,10 +149,33 @@ const UserList = () => {
   const getAvatarUrl = useCallback(
     (avatar) =>
       avatar && avatar !== 'null' && avatar !== 'undefined'
-        ? `http://127.0.0.1:8000/storage/avatars/${avatar}`
+        ? `http://127.0.0.1:8000/storage/avatars/${avatar.split('?')[0]}?t=${Date.now()}`
         : 'http://127.0.0.1:8000/storage/avatars/default.png',
     []
   );
+
+  // Kiểm tra token khi component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+      try {
+        await axios.get('http://127.0.0.1:8000/api/user', {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          withCredentials: true,
+        });
+      } catch (err) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        }
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const fetchUsers = useCallback(
     async (page = 1) => {
@@ -160,14 +185,12 @@ const UserList = () => {
       setError(null);
 
       try {
-        await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', {
-          withCredentials: true,
-        });
+        await axios.get('http://127.0.0.1:8000/sanctum/csrf-cookie', { withCredentials: true });
 
         const token = localStorage.getItem('token');
         if (!token) {
           setError('Vui lòng đăng nhập lại.');
-          navigate('/');
+          navigate('/login');
           return;
         }
 
@@ -179,14 +202,11 @@ const UserList = () => {
           },
         };
 
-        console.log(`Gửi yêu cầu: GET /api/listuser?page=${page}`);
         const response = await axios.get(`http://127.0.0.1:8000/api/listuser?page=${page}`, config);
-        console.log('Phản hồi:', response.data);
-
-        const newUsers = (response.data.data || []).map((user) => {
-          const roleName = user.roles && user.roles.length > 0 ? user.roles[0].name : user.role || 'user';
-          return { ...user, role: roleName };
-        });
+        const newUsers = (response.data.data || []).map((user) => ({
+          ...user,
+          role: user.roles && user.roles.length > 0 ? user.roles[0].name : 'member',
+        }));
 
         if (JSON.stringify(newUsers) !== JSON.stringify(prevUsers.current)) {
           setUsers(newUsers);
@@ -194,11 +214,16 @@ const UserList = () => {
         }
         setLastPage(response.data.last_page || 1);
       } catch (err) {
-        console.error('Lỗi fetchUsers:', err.response || err.message);
+        console.error('Lỗi fetchUsers:', err);
         const errorMessage = err.response
-          ? `Lỗi ${err.response.status}: ${err.response.data.message || err.response.statusText}`
+          ? `Lỗi ${err.response.status}: ${err.response.data?.message || err.response.statusText}`
           : `Lỗi kết nối: ${err.message}`;
-        setError(errorMessage);
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          setError(errorMessage);
+        }
       } finally {
         setLoading(false);
         isFetching.current = false;
@@ -217,38 +242,40 @@ const UserList = () => {
         const token = localStorage.getItem('token');
         if (!token) {
           setError('Vui lòng đăng nhập lại.');
+          navigate('/login');
           return;
         }
 
         const config = {
           withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         };
 
-        console.log(`Gửi yêu cầu: GET /api/listuser/${id}`);
         const response = await axios.get(`http://127.0.0.1:8000/api/listuser/${id}`, config);
-        console.log('Phản hồi:', response.data);
-
         const user = response.data;
-        const roleName = user.roles && user.roles.length > 0 ? user.roles[0].name : user.role || 'user';
-        setSelectedUser({ ...user, role: roleName });
+        setSelectedUser({
+          ...user,
+          role: user.roles && user.roles.length > 0 ? user.roles[0].name : 'member',
+        });
       } catch (err) {
-        console.error('Lỗi handleView:', err.response || err.message);
-        setError('Không thể tải thông tin người dùng: ' + (err.response?.data?.message || err.message));
+        console.error('Lỗi handleView:', err);
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          setError('Không thể tải thông tin người dùng: ' + (err.response?.data?.message || err.message));
+        }
       }
     },
-    []
+    [navigate]
   );
 
   const handleEdit = useCallback((user) => {
     setEditForm({
       id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
+      username: user.username || '',
+      email: user.email || '',
+      role: user.role || 'member',
       avatar: null,
     });
     setEditErrors(null);
@@ -276,15 +303,13 @@ const UserList = () => {
         return;
       }
 
-      // Hiển thị confirm dialog với window.confirm
-      if (!window.confirm('Bạn có chắc muốn lưu các thay đổi này?')) {
-        return;
-      }
+      if (!window.confirm('Bạn có chắc muốn lưu các thay đổi này?')) return;
 
       try {
         const token = localStorage.getItem('token');
         if (!token) {
           setEditErrors({ general: ['Vui lòng đăng nhập lại.'] });
+          navigate('/login');
           return;
         }
 
@@ -292,10 +317,7 @@ const UserList = () => {
         formData.append('username', editForm.username);
         formData.append('email', editForm.email);
         formData.append('role', editForm.role);
-        if (editForm.avatar) {
-          console.log('Avatar:', editForm.avatar);
-          formData.append('avatar', editForm.avatar);
-        }
+        if (editForm.avatar) formData.append('avatar', editForm.avatar);
         formData.append('_method', 'PUT');
 
         const config = {
@@ -303,14 +325,12 @@ const UserList = () => {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
+            'Content-Type': 'multipart/form-data',
           },
         };
 
-        console.log('Gửi yêu cầu: PUT /api/update/' + editForm.id);
-        console.log('FormData:', [...formData.entries()]);
         const response = await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, config);
-
-        console.log('Phản hồi:', response.data);
+        toast.success('Cập nhật thành công!');
 
         const editModalEl = document.getElementById('editModal');
         if (editModalEl) {
@@ -318,68 +338,94 @@ const UserList = () => {
           modal.hide();
         }
 
-        // Hiển thị thông báo thành công với window.alert
-        window.alert('Cập nhật người dùng thành công!');
-
         fetchUsers(currentPage);
       } catch (err) {
-        console.error('Lỗi handleEditSubmit:', err.response || err.message);
-        if (err.response && err.response.data && err.response.data.errors) {
-          console.log('Chi tiết lỗi:', err.response.data.errors);
-          setEditErrors(err.response.data.errors);
+        console.error('Lỗi handleEditSubmit:', err);
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else if (err.response?.status === 409) {
+          toast.error('Tải lại trang trước khi update.');
+          setTimeout(() => window.location.reload(), 2000);
+        } else if (err.response?.status === 422) {
+          const errors = err.response.data.errors || { general: [err.response.data.message || 'Dữ liệu không hợp lệ.'] };
+          setEditErrors(errors);
         } else {
           setEditErrors({ general: [err.response?.data?.message || err.message] });
         }
       }
     },
-    [editForm, fetchUsers, currentPage]
+    [editForm, fetchUsers, currentPage, navigate]
   );
 
   const handleDelete = useCallback(
     async (id) => {
-      // Hiển thị confirm dialog với window.confirm
-      if (!window.confirm('Bạn có chắc muốn xóa người dùng này?')) {
-        return;
-      }
+      if (!window.confirm('Bạn có chắc muốn xóa người dùng này?')) return;
 
       try {
         const token = localStorage.getItem('token');
         if (!token) {
           setError('Vui lòng đăng nhập lại.');
+          navigate('/login');
           return;
         }
 
         const config = {
           withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         };
 
-        console.log(`Gửi yêu cầu: DELETE /api/delete/${id}`);
         await axios.delete(`http://127.0.0.1:8000/api/delete/${id}`, config);
-
-        // Hiển thị thông báo thành công với window.alert
-        window.alert('Xóa người dùng thành công!');
-
+        toast.success('Xóa người dùng thành công!');
         fetchUsers(currentPage);
       } catch (err) {
-        console.error('Lỗi handleDelete:', err.response || err.message);
-        setError('Không thể xóa người dùng: ' + (err.response?.data?.message || err.message));
+        console.error('Lỗi handleDelete:', err);
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          setError('Không thể xóa người dùng: ' + (err.response?.data?.message || err.message));
+        }
       }
     },
-    [fetchUsers, currentPage]
+    [fetchUsers, currentPage, navigate]
   );
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate('/');
+    navigate('/login');
   };
 
   const handleGoHome = () => {
     navigate('/home');
   };
+
+  const getPageNumbers = () => {
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(lastPage, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    const pageNumbers = [];
+    for (let i = startPage; i <= endPage; i++) pageNumbers.push(i);
+
+    if (startPage > 2) {
+      pageNumbers.unshift('...');
+      pageNumbers.unshift(1);
+    } else if (startPage === 2) pageNumbers.unshift(1);
+
+    if (endPage < lastPage - 1) {
+      pageNumbers.push('...');
+      pageNumbers.push(lastPage);
+    } else if (endPage === lastPage - 1) pageNumbers.push(lastPage);
+
+    return pageNumbers;
+  };
+
+  const pageNumbers = getPageNumbers();
 
   return (
     <div className="container mt-4">
@@ -422,13 +468,13 @@ const UserList = () => {
               {users.map((user) => (
                 <tr key={user.id}>
                   <td>{user.id}</td>
-                  <td>{user.username}</td>
-                  <td>{user.email}</td>
+                  <td>{user.username || 'N/A'}</td>
+                  <td>{user.email || 'N/A'}</td>
                   <td>{user.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}</td>
                   <td>
                     <img
                       src={getAvatarUrl(user.avatar)}
-                      alt={user.username}
+                      alt={user.username || 'Avatar'}
                       style={{ maxWidth: '50px', borderRadius: '50%' }}
                     />
                   </td>
@@ -473,14 +519,15 @@ const UserList = () => {
                     Trước
                   </button>
                 </li>
-                {Array.from({ length: lastPage }, (_, i) => i + 1).map((page) => (
+                {pageNumbers.map((page, index) => (
                   <li
-                    key={page}
-                    className={`page-item ${currentPage === page ? 'active' : ''}`}
+                    key={index}
+                    className={`page-item ${currentPage === page ? 'active' : ''} ${page === '...' ? 'disabled' : ''}`}
                   >
                     <button
                       className="page-link"
-                      onClick={() => setCurrentPage(page)}
+                      onClick={() => page !== '...' && setCurrentPage(page)}
+                      disabled={page === '...'}
                     >
                       {page}
                     </button>
@@ -511,6 +558,7 @@ const UserList = () => {
         handleEditSubmit={handleEditSubmit}
         errors={editErrors}
       />
+      <ToastContainer />
     </div>
   );
 };

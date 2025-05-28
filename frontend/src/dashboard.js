@@ -12,7 +12,7 @@ import {
   BarElement,
   ArcElement,
   Legend,
-  Filler, // Thêm Filler vào đây
+  Filler,
 } from 'chart.js';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
@@ -33,7 +33,7 @@ ChartJS.register(
   BarElement,
   ArcElement,
   Legend,
-  Filler // Đăng ký plugin Filler
+  Filler
 );
 
 // Animated number counter component
@@ -84,6 +84,7 @@ const Dashboard = () => {
   const itemsPerPage = 5;
   const location = useLocation();
   const navigate = useNavigate();
+  const currentYear = new Date().getFullYear(); // Năm hiện tại (2025)
 
   // Hàm lấy dữ liệu từ API
   const fetchFinanceData = async (frame, year = null) => {
@@ -111,12 +112,22 @@ const Dashboard = () => {
         },
       });
 
-      setFinanceData(response.data);
-      console.log('Finance Data:', response.data); // Debug dữ liệu
+      // Lọc dữ liệu theo năm hiện tại nếu không phải chế độ 'year'
+      const filteredData = frame === 'year' ? response.data : {
+        ...response.data,
+        labels: response.data.labels.filter(label => label.startsWith(currentYear.toString())),
+        income: response.data.income.filter((_, index) => response.data.labels[index].startsWith(currentYear.toString())),
+        expenses: response.data.expenses.filter((_, index) => response.data.labels[index].startsWith(currentYear.toString())),
+        period_options: response.data.period_options.filter(option => option.value.startsWith(currentYear.toString())),
+        transactions: response.data.transactions.filter(tx => tx.date.startsWith(currentYear.toString())),
+      };
+
+      setFinanceData(filteredData);
+      console.log('Filtered Finance Data:', filteredData);
       setCurrentPage(1);
     } catch (err) {
       toast.error('Không thể tải dữ liệu tài chính: ' + (err.response?.data?.message || err.message));
-      console.error('Fetch Finance Error:', err); // Debug lỗi
+      console.error('Fetch Finance Error:', err);
       setFinanceData({ income: [], expenses: [], categories: [], transactions: [], labels: [], period_options: [] });
     }
   };
@@ -145,7 +156,6 @@ const Dashboard = () => {
 
     if (shouldRefresh) {
       fetchFinanceData(timeFrame, selectedYear);
-      // Xóa query parameter sau khi làm mới
       navigate('/dashboard', { replace: true });
     } else {
       fetchFinanceData(timeFrame, selectedYear);
@@ -236,6 +246,7 @@ const Dashboard = () => {
     }
     return label;
   };
+
   // Dữ liệu biểu đồ Line Chart
   const lineChartData = {
     labels: financeData.labels
@@ -410,6 +421,48 @@ const Dashboard = () => {
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
+
+  // Tạo danh sách các nút phân trang
+  const getPaginationItems = () => {
+    const maxPagesToShow = 5; // Số trang tối đa hiển thị (không tính ellipsis)
+    const items = [];
+
+    if (totalPages <= maxPagesToShow) {
+      // Nếu ít trang, hiển thị tất cả
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(i);
+      }
+    } else {
+      // Hiển thị trang đầu
+      items.push(1);
+
+      // Tính toán phạm vi trang xung quanh trang hiện tại
+      const leftBound = Math.max(2, currentPage - 1);
+      const rightBound = Math.min(totalPages - 1, currentPage + 1);
+
+      // Thêm dấu "..." nếu cần
+      if (leftBound > 2) {
+        items.push('...');
+      }
+
+      // Thêm các trang xung quanh trang hiện tại
+      for (let i = leftBound; i <= rightBound; i++) {
+        items.push(i);
+      }
+
+      // Thêm dấu "..." nếu cần
+      if (rightBound < totalPages - 1) {
+        items.push('...');
+      }
+
+      // Hiển thị trang cuối
+      if (totalPages > 1) {
+        items.push(totalPages);
+      }
+    }
+
+    return items;
   };
 
   return (
@@ -631,9 +684,16 @@ const Dashboard = () => {
                       <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
                         <button className="page-link" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Trước</button>
                       </li>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => handlePageChange(page)}>{page}</button>
+                      {getPaginationItems().map((item, index) => (
+                        <li
+                          key={index}
+                          className={`page-item ${item === currentPage ? 'active' : item === '...' ? 'disabled' : ''}`}
+                        >
+                          {item === '...' ? (
+                            <span className="page-link">...</span>
+                          ) : (
+                            <button className="page-link" onClick={() => handlePageChange(item)}>{item}</button>
+                          )}
                         </li>
                       ))}
                       <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
