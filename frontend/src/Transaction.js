@@ -1,6 +1,6 @@
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Header from './Header';
 import Slider from './Slider';
@@ -26,6 +26,11 @@ function Transaction() {
   const [showModalDetail, setShowModalDetail] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryType, setNewCategoryType] = useState('income');
+  const [loiCategory, setLoiCategory] = useState('');
+  const inputRef = useRef(undefined);
   const [formData, setFormData] = useState({
     ten: '',
     soTien: '',
@@ -106,6 +111,28 @@ function Transaction() {
     if (!ngay) return 'Vui lòng chọn ngày giao dịch';
     if (ngay > today) return 'Không được chọn ngày giao dịch trong tương lai';
     return '';
+  };
+
+  // Thêm category mới
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) {
+      setLoiCategory('Vui lòng nhập tên danh mục');
+      return;
+    }
+    try {
+      await axios.post('/categories', {
+        name: newCategoryName,
+        type: newCategoryType,
+      }, { withCredentials: true });
+      setShowAddCategory(false);
+      setNewCategoryName('');
+      setNewCategoryType('income');
+      setLoiCategory('');
+      fetchCategories(); // reload lại danh mục
+    } catch (error) {
+      setLoiCategory(error.response?.data?.error || 'Lỗi khi thêm danh mục');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -442,6 +469,51 @@ function Transaction() {
                   )}
                 </div>
               </div>
+
+              {/* Modal thêm danh mục */}
+              {showAddCategory && (
+                <div className="modal fade show d-block" tabIndex="-1">
+                  <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content">
+                      <form onSubmit={handleAddCategory}>
+                        <div className="modal-header">
+                          <h5 className="modal-title">Thêm Danh mục mới</h5>
+                          <button type="button" className="btn-close" onClick={() => setShowAddCategory(false)}></button>
+                        </div>
+                        <div className="modal-body">
+                          {loiCategory && <div className="alert alert-danger">{loiCategory}</div>}
+                          <div className="mb-3">
+                            <label className="form-label">Tên danh mục</label>
+                            <input
+                              ref={inputRef}
+                              type="text"
+                              className="form-control"
+                              value={newCategoryName}
+                              onChange={e => setNewCategoryName(e.target.value)}
+                            />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label">Loại</label>
+                            <select
+                              className="form-select"
+                              value={newCategoryType}
+                              onChange={e => setNewCategoryType(e.target.value)}
+                            >
+                              <option value="income">Thu nhập</option>
+                              <option value="expense">Chi tiêu</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="modal-footer">
+                          <button type="submit" className="btn btn-success">Thêm</button>
+                          <button type="button" className="btn btn-secondary" onClick={() => setShowAddCategory(false)}>Hủy</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                   <div className="modal-content">
@@ -484,20 +556,31 @@ function Transaction() {
                           <label htmlFor="category_id" className="form-label">
                             Danh mục
                           </label>
-                          <select
-                            className="form-select"
-                            id="category_id"
-                            name="category_id"
-                            value={formData.category_id}
-                            onChange={handleChange}
-                          >
-                            <option value="">Chọn danh mục</option>
-                            {categories.map(cat => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name} ({cat.type})
-                              </option>
-                            ))}
-                          </select>
+                          <div className="input-group">
+                            <select
+                              className="form-select"
+                              id="category_id"
+                              name="category_id"
+                              value={formData.category_id}
+                              onChange={handleChange}
+                            >
+                              <option value="">Chọn danh mục</option>
+                              {categories.map(cat => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name} ({cat.type})
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn btn-outline-success"
+                              title="Thêm danh mục"
+                              onClick={() => {
+                                setShowAddCategory(true);
+                                setTimeout(() => inputRef.current?.focus(), 200);
+                              }}
+                            >+</button>
+                          </div>
                         </div>
                         <div className="mb-3">
                           <label htmlFor="ngay" className="form-label">

@@ -1,4 +1,16 @@
 services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_USER: laravel_user
+      MYSQL_PASSWORD: laravel_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - db-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
   frontend:
     build:
       context: ./frontend
@@ -35,19 +47,7 @@ services:
       - ./backend:/var/www
     depends_on:
       - backend
-      - frontend
-
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_DATABASE: laravel
-      MYSQL_USER: laravel_user
-      MYSQL_PASSWORD: laravel_password
-      MYSQL_ROOT_PASSWORD: root_password
-    volumes:
-      - db-data:/var/lib/mysql
-    ports:
-      - "3306:3306"
+      - frontend  
 
 volumes:
   db-data:
