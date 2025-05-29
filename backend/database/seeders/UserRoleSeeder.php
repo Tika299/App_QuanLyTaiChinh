@@ -11,7 +11,9 @@ class UserRoleSeeder extends Seeder
     public function run(): void
     {
         // Xóa bảng user_role trước khi gán lại
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('user_role')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Gán role admin cho user_id = 1
         DB::table('user_role')->insert([

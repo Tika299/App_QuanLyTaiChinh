@@ -11,6 +11,7 @@ class Transaction extends Model
         'name',
         'amount',
         'description',
+        'created_at',
     ];
 
     public function category()

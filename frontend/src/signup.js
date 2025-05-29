@@ -4,6 +4,24 @@ import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Hàm chuyển đổi full-width sang half-width
+const normalizeToHalfWidth = (value) => {
+  if (!value) return value;
+  const fullWidthMap = {
+    '０': '0',
+    '１': '1',
+    '２': '2',
+    '３': '3',
+    '４': '4',
+    '５': '5',
+    '６': '6',
+    '７': '7',
+    '８': '8',
+    '９': '9',
+  };
+  return value.replace(/[０-９]/g, (match) => fullWidthMap[match]);
+};
+
 function SignupForm() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -12,35 +30,95 @@ function SignupForm() {
 
   const navigate = useNavigate();
 
+  // Xử lý nhập username và giới hạn ký tự
+  const handleUsernameChange = (e) => {
+    const input = normalizeToHalfWidth(e.target.value); // Chuẩn hóa full-width
+    if (input.length > 50) {
+      toast.error('Tên người dùng không được vượt quá 50 ký tự.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+    setUsername(input);
+  };
+
+  // Xử lý nhập email và giới hạn ký tự
+  const handleEmailChange = (e) => {
+    const input = normalizeToHalfWidth(e.target.value); // Chuẩn hóa full-width
+    if (input.length > 100) {
+      toast.error('Email không được vượt quá 100 ký tự.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+    setEmail(input);
+  };
+
+  // Xử lý nhập password và giới hạn ký tự
+  const handlePasswordChange = (e) => {
+    const input = e.target.value; // Không chuẩn hóa để giữ nguyên ký tự
+    if (input.length > 50) {
+      toast.error('Mật khẩu không được vượt quá 50 ký tự.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+    setPassword(input);
+  };
+
+  // Xử lý nhập confirm password và giới hạn ký tự
+  const handleConfirmPasswordChange = (e) => {
+    const input = e.target.value; // Không chuẩn hóa để giữ nguyên ký tự
+    if (input.length > 50) {
+      toast.error('Xác nhận mật khẩu không được vượt quá 50 ký tự.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+    setConfirmPassword(input);
+  };
+
   const handleSignUp = async (e) => {
     e.preventDefault();
 
     // Kiểm tra trống
     if (!username || !email || !password || !confirmPassword) {
-      toast.warn('Vui lòng điền đầy đủ thông tin.', { position: 'top-right' });
+      toast.error('Vui lòng điền đầy đủ thông tin.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
-    // Ràng buộc độ dài
-    if (username.length > 50) {
-      toast.warn('Tên người dùng không được vượt quá 50 ký tự.', { position: 'top-right' });
+    // Kiểm tra định dạng email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Email không hợp lệ', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
-    if (email.length > 100) {
-      toast.warn('Email không được vượt quá 100 ký tự.', { position: 'top-right' });
-      return;
-    }
+
+    // Kiểm tra độ dài mật khẩu
     if (password.length < 6) {
-      toast.warn('Mật khẩu phải có ít nhất 6 ký tự.', { position: 'top-right' });
-      return;
-    }
-    if (password.length > 100) {
-      toast.warn('Mật khẩu không được vượt quá 100 ký tự.', { position: 'top-right' });
+      toast.error('Mật khẩu phải có ít nhất 6 ký tự.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
+    // Kiểm tra mật khẩu và xác nhận mật khẩu
     if (password !== confirmPassword) {
-      toast.error('Mật khẩu và xác nhận mật khẩu không khớp.', { position: 'top-right' });
+      toast.error('Mật khẩu và xác nhận mật khẩu không khớp.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -104,11 +182,11 @@ function SignupForm() {
           vietnameseMessage = 'Tên người dùng đã tồn tại.';
         }
 
-        toast.error(vietnameseMessage, { position: 'top-right' });
+        toast.error(vietnameseMessage, { position: 'top-right', autoClose: 3000 });
       } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message, { position: 'top-right' });
+        toast.error(error.response.data.message, { position: 'top-right', autoClose: 3000 });
       } else {
-        toast.error('Đăng ký thất bại!', { position: 'top-right' });
+        toast.error('Đăng ký thất bại!', { position: 'top-right', autoClose: 3000 });
       }
     }
   };
@@ -126,9 +204,8 @@ function SignupForm() {
             type="text"
             className="form-control"
             id="username"
-            maxLength={50}
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={handleUsernameChange}
             required
           />
         </div>
@@ -139,9 +216,8 @@ function SignupForm() {
             type="email"
             className="form-control"
             id="email"
-            maxLength={100}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={handleEmailChange}
             required
           />
         </div>
@@ -152,9 +228,8 @@ function SignupForm() {
             type="password"
             className="form-control"
             id="password"
-            maxLength={100}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={handlePasswordChange}
             required
           />
         </div>
@@ -165,9 +240,8 @@ function SignupForm() {
             type="password"
             className="form-control"
             id="confirmPassword"
-            maxLength={100}
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={handleConfirmPasswordChange}
             required
           />
         </div>

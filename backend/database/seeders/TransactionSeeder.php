@@ -7,12 +7,15 @@ use App\Models\Transaction;
 use App\Models\Category;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TransactionSeeder extends Seeder
 {
     public function run(): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         Transaction::truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $users = User::all();
 

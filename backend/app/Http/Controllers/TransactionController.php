@@ -44,6 +44,7 @@ class TransactionController extends Controller
                     'danhMuc' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                     'ngay' => $transaction->created_at->format('Y-m-d'),
                     'moTa' => $transaction->description,
+                    'updated_at' => $transaction->updated_at->toDateTimeString(),
                 ];
             });
 
@@ -58,17 +59,23 @@ class TransactionController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'ten' => 'required|string|max:50',
+                'ten' => [
+                    'required',
+                    'string',
+                    'max:50',
+                    'regex:/^[\p{L}\p{N}\s_-]+$/u'
+                ],
                 'soTien' => [
                     'required',
                     'numeric',
                     'gt:0',
-                    'max:99999999.99', // Giới hạn tối đa 99,999,999.99
+                    'max:99999999.99',
                 ],
                 'category_id' => ['required', 'exists:categories,id,user_id,' . auth()->id()],
                 'ngay' => 'required|date|before_or_equal:today',
                 'moTa' => 'nullable|string',
             ], [
+                'ten.regex' => 'Tên không được chứa ký tự đặc biệt.',
                 'soTien.max' => 'Vui lòng nhập lại, đã vượt quá số 0 tối thiểu 8 chữ số.',
             ]);
 
@@ -110,6 +117,7 @@ class TransactionController extends Controller
                 'danhMuc' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                 'ngay' => $transaction->created_at->format('Y-m-d'),
                 'moTa' => $transaction->description,
+                'updated_at' => $transaction->updated_at->toDateTimeString(),
             ], 201);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Danh mục không tồn tại: ' . $e->getMessage());
@@ -143,6 +151,7 @@ class TransactionController extends Controller
                 'danhMuc' => $transaction->category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                 'ngay' => $transaction->created_at->format('Y-m-d'),
                 'moTa' => $transaction->description,
+                'updated_at' => $transaction->updated_at->toDateTimeString(),
             ]);
         } catch (\Exception $e) {
             Log::error('Lỗi trong show: ' . $e->getMessage());
@@ -161,17 +170,23 @@ class TransactionController extends Controller
             $transaction = Transaction::where('user_id', $userId)->findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'ten' => 'required|string|max:50',
+                'ten' => [
+                    'required',
+                    'string',
+                    'max:50',
+                    'regex:/^[\p{L}\p{N}\s_-]+$/u'
+                ],
                 'soTien' => [
                     'required',
                     'numeric',
                     'gt:0',
-                    'max:99999999.99', // Giới hạn tối đa 99,999,999.99
+                    'max:99999999.99',
                 ],
                 'category_id' => ['required', 'exists:categories,id,user_id,' . $userId],
                 'ngay' => 'required|date|before_or_equal:today',
                 'moTa' => 'nullable|string',
             ], [
+                'ten.regex' => 'Tên không được chứa ký tự đặc biệt.',
                 'soTien.max' => 'Vui lòng nhập lại, đã vượt quá số 0 tối thiểu 8 chữ số.',
             ]);
 
@@ -198,7 +213,6 @@ class TransactionController extends Controller
                 'created_at' => $request->ngay,
             ]);
 
-            // Reload the transaction with category relationship
             $updatedTransaction = Transaction::where('user_id', $userId)->with('category')->findOrFail($id);
 
             return response()->json([
@@ -210,10 +224,11 @@ class TransactionController extends Controller
                 'danhMuc' => $category->type === 'income' ? 'Thu nhập' : 'Chi tiêu',
                 'ngay' => $updatedTransaction->created_at->format('Y-m-d'),
                 'moTa' => $updatedTransaction->description,
+                'updated_at' => $updatedTransaction->updated_at->toDateTimeString(),
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Giao dịch hoặc danh mục không tồn tại: ' . $e->getMessage());
-            return response()->json(['error' => 'Giao dịch hoặc danh mục không tồn tại.'], 404);
+            return response()->json(['error' => 'Giao dịch hoặc danh mục không tồn tại. Vui lòng tải lại trang.'], 404);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '22003') {
                 Log::error('Số tiền vượt quá giới hạn: ' . $e->getMessage());
@@ -240,7 +255,7 @@ class TransactionController extends Controller
             return response()->json(['message' => 'Giao dịch đã được xóa']);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Giao dịch không tồn tại: ' . $e->getMessage());
-            return response()->json(['error' => 'Giao dịch không tồn tại.'], 404);
+            return response()->json(['error' => 'Giao dịch không tồn tại. Vui lòng tải lại trang.'], 404);
         } catch (\Exception $e) {
             Log::error('Lỗi trong destroy: ' . $e->getMessage());
             return response()->json(['error' => 'Lỗi server: ' . $e->getMessage()], 500);

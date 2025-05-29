@@ -6,12 +6,16 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use App\Models\Goal;
 use App\Models\Category;
+use Illuminate\Support\Facades\DB;
 
 class GoalSeeder extends Seeder
 {
     public function run(): void
     {
+        // Xóa toàn bộ dữ liệu bảng goals
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         Goal::truncate(); // Xóa dữ liệu cũ
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // $user1 = \App\Models\User::where('email', 'admin@gmail.com')->first();
         // $user2 = \App\Models\User::where('email', 'user2@gmail.com')->first();

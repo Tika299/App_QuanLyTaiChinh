@@ -1,6 +1,6 @@
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Header from './Header';
 import Slider from './Slider';
@@ -17,6 +17,7 @@ axios.interceptors.request.use(config => {
 });
 
 function Transaction() {
+  const today = new Date().toISOString().slice(0, 10);
   const [giaoDich, setGiaoDich] = useState([]);
   const [locDanhMuc, setLocDanhMuc] = useState('Tất cả');
   const [locNgay, setLocNgay] = useState('');
@@ -25,6 +26,11 @@ function Transaction() {
   const [showModalDetail, setShowModalDetail] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryType, setNewCategoryType] = useState('income');
+  const [loiCategory, setLoiCategory] = useState('');
+  const inputRef = useRef(undefined);
   const [formData, setFormData] = useState({
     ten: '',
     soTien: '',
@@ -39,12 +45,46 @@ function Transaction() {
     category_id: '',
     ngay: '',
     moTa: '',
+    updated_at: '',
   });
   const [loi, setLoi] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const navigate = useNavigate();
+  const toastRef = useRef(null);
+
+  // Hàm hiển thị toast
+  const showToast = (message, type = 'success') => {
+    const toastContainer = toastRef.current;
+    if (!toastContainer) return;
+
+    const toastId = `toast-${Date.now()}`;
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    const bsToast = new window.bootstrap.Toast(toast, { delay: 3000 });
+    bsToast.show();
+
+    toast.addEventListener('hidden.bs.toast', () => {
+      toast.remove();
+    });
+  };
 
   // Lấy danh sách danh mục
   const fetchCategories = async () => {
@@ -53,7 +93,6 @@ function Transaction() {
         withCredentials: true,
       });
       setCategories(response.data);
-      console.log('Danh mục:', response.data); // Debug danh mục
     } catch (error) {
       console.error('Lỗi khi lấy danh mục:', error);
       setLoi(error.response?.data?.error || 'Không thể tải danh sách danh mục');
@@ -98,7 +137,7 @@ function Transaction() {
 
   const validateForm = (data) => {
     const { ten, soTien, category_id, ngay } = data;
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().slice(0, 10);
     if (!ten) return 'Vui lòng nhập tên giao dịch';
     if (!soTien) return 'Vui lòng nhập số tiền giao dịch';
     if (isNaN(soTien) || soTien <= 0) return 'Số tiền phải là số dương';
@@ -106,6 +145,29 @@ function Transaction() {
     if (!ngay) return 'Vui lòng chọn ngày giao dịch';
     if (ngay > today) return 'Không được chọn ngày giao dịch trong tương lai';
     return '';
+  };
+
+  // Thêm category mới
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) {
+      setLoiCategory('Vui lòng nhập tên danh mục');
+      return;
+    }
+    try {
+      await axios.post('/categories', {
+        name: newCategoryName,
+        type: newCategoryType,
+      }, { withCredentials: true });
+      setShowAddCategory(false);
+      setNewCategoryName('');
+      setNewCategoryType('income');
+      setLoiCategory('');
+      fetchCategories();
+      showToast('Danh mục đã được thêm thành công!', 'success');
+    } catch (error) {
+      setLoiCategory(error.response?.data?.error || 'Lỗi khi thêm danh mục');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -131,7 +193,7 @@ function Transaction() {
         { withCredentials: true }
       );
       setGiaoDich([...giaoDich, response.data]);
-      alert('Giao dịch đã được thêm thành công!');
+      showToast('Giao dịch đã được thêm thành công!', 'success');
       setShowModal(false);
       setFormData({ ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
       navigate('/dashboard?refresh=true');
@@ -153,6 +215,7 @@ function Transaction() {
         category_id: transaction.category_id,
         ngay: transaction.ngay,
         moTa: transaction.moTa,
+        updated_at: transaction.updated_at,
       });
       setShowModalEdit(true);
     }
@@ -164,6 +227,13 @@ function Transaction() {
     if (loiValidate) {
       setLoi(loiValidate);
       return;
+    }
+
+    const originalTransaction = giaoDich.find(gd => gd.id === formDataEdit.id);
+    if (originalTransaction && originalTransaction.ngay !== formDataEdit.ngay) {
+      if (!window.confirm('Bạn có chắc chắn muốn thay đổi ngày giao dịch không?')) {
+        return;
+      }
     }
 
     try {
@@ -181,25 +251,72 @@ function Transaction() {
         { withCredentials: true }
       );
       setGiaoDich(giaoDich.map(gd => (gd.id === formDataEdit.id ? response.data : gd)));
-      alert('Giao dịch đã được cập nhật!');
+      showToast('Giao dịch đã được cập nhật thành công!', 'success');
       setShowModalEdit(false);
-      setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
+      setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '', updated_at: '' });
       navigate('/dashboard?refresh=true');
     } catch (error) {
       console.log('Phản hồi lỗi:', error.response?.data);
-      setLoi(error.response?.data?.error || 'Lỗi khi cập nhật giao dịch');
+      if (error.response?.status === 422) {
+        setLoi(error.response?.data?.error || 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại ngày hoặc các trường khác.');
+      } else {
+        setLoi(error.response?.data?.error || 'Lỗi khi cập nhật giao dịch');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Hàm hiển thị toast xác nhận
+  const showConfirmToast = (message, onConfirm) => {
+    const toastContainer = toastRef.current;
+    if (!toastContainer) return;
+
+    const toastId = `toast-confirm-${Date.now()}`;
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast align-items-center text-white bg-warning border-0';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <div class="ms-auto me-2 m-auto">
+          <button type="button" class="btn btn-sm btn-success me-2" id="${toastId}-confirm">Xác nhận</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="toast" id="${toastId}-cancel">Hủy</button>
+        </div>
+      </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    const bsToast = new window.bootstrap.Toast(toast, { autohide: false });
+    bsToast.show();
+
+    const confirmButton = document.getElementById(`${toastId}-confirm`);
+    const cancelButton = document.getElementById(`${toastId}-cancel`);
+
+    confirmButton.addEventListener('click', () => {
+      onConfirm();
+      bsToast.hide();
+    });
+
+    toast.addEventListener('hidden.bs.toast', () => {
+      toast.remove();
+    });
+  };
+
   const xuLyXoaGiaoDich = async (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa giao dịch này không?')) {
+    showConfirmToast('Bạn có chắc chắn muốn xóa giao dịch này không?', async () => {
       try {
         setLoading(true);
         await axios.delete(`/transactions/${id}`, { withCredentials: true });
         setGiaoDich(giaoDich.filter(gd => gd.id !== id));
-        alert('Giao dịch đã được xóa!');
+        showToast('Giao dịch đã được xóa!', 'success');
         navigate('/dashboard?refresh=true');
       } catch (error) {
         console.log('Phản hồi lỗi:', error.response?.data);
@@ -207,7 +324,7 @@ function Transaction() {
       } finally {
         setLoading(false);
       }
-    }
+    });
   };
 
   const xuLyXemChiTiet = async (id) => {
@@ -240,7 +357,7 @@ function Transaction() {
 
   const handleCloseModalEdit = () => {
     setShowModalEdit(false);
-    setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '' });
+    setFormDataEdit({ id: null, ten: '', soTien: '', category_id: '', ngay: '', moTa: '', updated_at: '' });
     setLoi('');
   };
 
@@ -254,10 +371,9 @@ function Transaction() {
     const { name, value } = e.target;
     if (name === 'locDanhMuc') setLocDanhMuc(value);
     if (name === 'locNgay') setLocNgay(value);
-    setCurrentPage(1); // Reset về trang đầu khi thay đổi bộ lọc
+    setCurrentPage(1);
   };
 
-  // Phân trang
   const totalItems = giaoDich.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -279,6 +395,7 @@ function Transaction() {
           <div className="container-fluid py-4 bg-light min-vh-100">
             <div className="container">
               <h1 className="mb-4 fw-bold">Quản lý Giao dịch</h1>
+              <div className="toast-container position-fixed top-0 end-0 p-3" ref={toastRef}></div>
               {loading && (
                 <div className="spinner-border" role="status">
                   <span className="visually-hidden">Loading...</span>
@@ -317,7 +434,7 @@ function Transaction() {
                         value={locNgay}
                         onChange={handleFilterChange}
                         className="form-control"
-                        max="2025-05-24"
+                        max={today}
                       />
                     </div>
                     <div className="col-md-4 d-flex align-items-end">
@@ -349,7 +466,7 @@ function Transaction() {
                         {paginatedTransactions.map(gd => (
                           <tr key={gd.id}>
                             <td>{gd.ten}</td>
-                            <td className={gd.soTien >= 0 ? 'text-success' : 'text-danger'}>
+                            <td className={gd.danhMuc === "Thu nhập" ? 'text-success' : 'text-danger'}>
                               {Math.abs(gd.soTien).toLocaleString('vi-VN')} VNĐ
                             </td>
                             <td>
@@ -364,7 +481,7 @@ function Transaction() {
                                 {gd.category_name}
                               </span>
                             </td>
-                            <td>{gd.ngay}</td>
+                            <td>{toDisplayDateFormat(gd.ngay)}</td>
                             <td>
                               <button
                                 onClick={() => xuLyXemChiTiet(gd.id)}
@@ -435,6 +552,51 @@ function Transaction() {
                   )}
                 </div>
               </div>
+
+              {/* Modal thêm danh mục */}
+              {showAddCategory && (
+                <div className="modal fade show d-block" tabIndex="-1">
+                  <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content">
+                      <form onSubmit={handleAddCategory}>
+                        <div className="modal-header">
+                          <h5 className="modal-title">Thêm Danh mục mới</h5>
+                          <button type="button" className="btn-close" onClick={() => setShowAddCategory(false)}></button>
+                        </div>
+                        <div className="modal-body">
+                          {loiCategory && <div className="alert alert-danger">{loiCategory}</div>}
+                          <div className="mb-3">
+                            <label className="form-label">Tên danh mục</label>
+                            <input
+                              ref={inputRef}
+                              type="text"
+                              className="form-control"
+                              value={newCategoryName}
+                              onChange={e => setNewCategoryName(e.target.value)}
+                            />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label">Loại</label>
+                            <select
+                              className="form-select"
+                              value={newCategoryType}
+                              onChange={e => setNewCategoryType(e.target.value)}
+                            >
+                              <option value="income">Thu nhập</option>
+                              <option value="expense">Chi tiêu</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="modal-footer">
+                          <button type="submit" className="btn btn-success">Thêm</button>
+                          <button type="button" className="btn btn-secondary" onClick={() => setShowAddCategory(false)}>Hủy</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                   <div className="modal-content">
@@ -477,20 +639,31 @@ function Transaction() {
                           <label htmlFor="category_id" className="form-label">
                             Danh mục
                           </label>
-                          <select
-                            className="form-select"
-                            id="category_id"
-                            name="category_id"
-                            value={formData.category_id}
-                            onChange={handleChange}
-                          >
-                            <option value="">Chọn danh mục</option>
-                            {categories.map(cat => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name} ({cat.type})
-                              </option>
-                            ))}
-                          </select>
+                          <div className="input-group">
+                            <select
+                              className="form-select"
+                              id="category_id"
+                              name="category_id"
+                              value={formData.category_id}
+                              onChange={handleChange}
+                            >
+                              <option value="">Chọn danh mục</option>
+                              {categories.map(cat => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name} ({cat.type})
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn btn-outline-success"
+                              title="Thêm danh mục"
+                              onClick={() => {
+                                setShowAddCategory(true);
+                                setTimeout(() => inputRef.current?.focus(), 200);
+                              }}
+                            >+</button>
+                          </div>
                         </div>
                         <div className="mb-3">
                           <label htmlFor="ngay" className="form-label">
@@ -503,7 +676,7 @@ function Transaction() {
                             name="ngay"
                             value={formData.ngay}
                             onChange={handleChange}
-                            max="2025-05-24"
+                            max={today}
                           />
                         </div>
                         <div className="mb-3">
@@ -605,7 +778,7 @@ function Transaction() {
                             name="ngay"
                             value={formDataEdit.ngay}
                             onChange={(e) => handleChange(e, true)}
-                            max="2025-05-24"
+                            max={today}
                           />
                         </div>
                         <div className="mb-3">
@@ -685,7 +858,11 @@ function Transaction() {
                           </div>
                           <div className="mb-3">
                             <label className="form-label fw-bold">Ngày giao dịch</label>
-                            <p>{selectedTransaction.ngay}</p>
+                            <p>{toDisplayDateFormat(selectedTransaction.ngay)}</p>
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Ngày cập nhật</label>
+                            <p>{toDisplayDateTimeFormat(selectedTransaction.updated_at)}</p>
                           </div>
                           <div className="mb-3">
                             <label className="form-label fw-bold">Mô tả</label>
@@ -712,6 +889,23 @@ function Transaction() {
       </div>
     </div>
   );
+}
+
+function toDisplayDateFormat(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+}
+
+function toDisplayDateTimeFormat(dateTimeStr) {
+  if (!dateTimeStr) return '';
+  const date = new Date(dateTimeStr);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
 export default Transaction;

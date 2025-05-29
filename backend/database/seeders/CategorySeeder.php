@@ -5,11 +5,18 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Category;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class CategorySeeder extends Seeder
 {
     public function run(): void
     {
+
+        // Xóa toàn bộ dữ liệu bảng categories
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        Category::truncate(); // Xóa dữ liệu cũ
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+
         $defaultCategories = [
             ['name' => 'Lương', 'type' => 'income', 'color' => '#4CAF50'],
             ['name' => 'Thưởng', 'type' => 'income', 'color' => '#2196F3'],

@@ -47,6 +47,7 @@ const Profile = () => {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
+            'Cache-Control': 'no-cache',
           },
         };
         const response = await axios.get('http://localhost:8000/api/user', {
@@ -54,8 +55,8 @@ const Profile = () => {
           signal: controller.signal,
         });
         const data = response.data;
+        console.log('API response for /api/user:', data); // Debug API response
         if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-          console.log('User data:', data);
           setUser(data);
           localStorage.setItem('user', JSON.stringify(data));
         } else {
@@ -100,9 +101,10 @@ const Profile = () => {
       ? `http://localhost:8000/storage/avatars/${user.avatar}`
       : 'http://localhost:8000/storage/avatars/default.png';
 
-  const formattedRole = user.role
-    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-    : 'User';
+  // Ánh xạ vai trò từ user.roles và hiển thị bằng tiếng Việt
+  const formattedRole = user.roles && user.roles.length > 0
+    ? user.roles[0].name === 'admin' ? 'Quản trị viên' : 'Người dùng'
+    : 'Người dùng';
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>

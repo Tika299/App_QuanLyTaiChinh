@@ -168,12 +168,15 @@ class CrudUserController extends Controller
         }
     }
 
+
+
+
     // Lấy danh sách người dùng
     public function getUsers(Request $request)
     {
         try {
             $users = User::with('roles:id,name')
-                ->select('id', 'username', 'email', 'avatar')
+                ->select('id', 'username', 'email', 'phone', 'city', 'bio', 'avatar', 'updated_at')
                 ->paginate(2);
 
             $users->getCollection()->transform(function ($user) {
@@ -200,7 +203,7 @@ class CrudUserController extends Controller
     {
         try {
             $user = User::with('roles:id,name')
-                ->select('id', 'username', 'email', 'avatar')
+                ->select('id', 'username', 'email', 'phone', 'city', 'bio', 'avatar', 'updated_at')
                 ->findOrFail($id);
 
             $user->avatar = $user->avatar ?: 'default.png';
@@ -231,16 +234,24 @@ class CrudUserController extends Controller
     }
 
 
+
+    // Cập nhật người dùng
+
     public function updateUser(Request $request, $id)
     {
         try {
-            // Kiểm tra xác thực người dùng
             $currentUser = Auth::guard('sanctum')->user();
             if (!$currentUser) {
                 throw new AuthenticationException('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
             }
 
-            // Xác thực dữ liệu đầu vào
+            $isAdmin = $currentUser->roles()->where('name', 'admin')->exists();
+            if (!$isAdmin && $currentUser->id != $id) {
+                return response()->json([
+                    'message' => 'Bạn không có quyền cập nhật thông tin của người dùng này.',
+                ], 403);
+            }
+
             $request->validate([
                 'username' => 'required|string|max:50|unique:users,username,' . $id,
                 'email' => 'required|email|max:100|unique:users,email,' . $id,
@@ -249,13 +260,22 @@ class CrudUserController extends Controller
                 'phone' => 'nullable|string|max:20',
                 'city' => 'nullable|string|max:255',
                 'bio' => 'nullable|string|max:1000',
+                'reset_avatar' => 'nullable|in:0,1',
+                'updated_at' => 'nullable|date',
             ]);
 
-            // Lấy thông tin người dùng
             $user = User::findOrFail($id);
 
-            // Chuẩn bị dữ liệu cập nhật
-            $updateData = [
+            // Log dữ liệu nhận được để debug
+            Log::info('Received update request', [
+                'user_id' => $id,
+                'request_data' => $request->all(),
+                'timestamp' => now()->toDateTimeString(),
+            ]);
+
+            // Kiểm tra xem có thay đổi dữ liệu chính không
+            $originalData = $user->only(['username', 'email', 'phone', 'city', 'bio']);
+            $newData = [
                 'username' => $request->username,
                 'email' => $request->email,
                 'phone' => $request->phone,
@@ -263,13 +283,54 @@ class CrudUserController extends Controller
                 'bio' => $request->bio,
             ];
 
+            $hasMainDataChanges = false;
+            foreach ($newData as $key => $value) {
+                if ($value !== $originalData[$key]) {
+                    $hasMainDataChanges = true;
+                    break;
+                }
+            }
+
+            // Tạm thời bỏ kiểm tra xung đột updated_at để debug
+            /*
+            $requestUpdatedAt = $request->input('updated_at');
+            if ($hasMainDataChanges && $requestUpdatedAt && $user->updated_at && $requestUpdatedAt !== $user->updated_at->toDateTimeString()) {
+                return response()->json([
+                    'message' => 'Dữ liệu đã thay đổi. Vui lòng tải lại trang trước khi cập nhật.',
+                ], 409);
+            }
+            */
+
+            // Kiểm tra xem có bất kỳ thay đổi nào không
+            $hasChanges = $hasMainDataChanges;
+            if ($request->filled('password') || $request->hasFile('avatar') || $request->input('reset_avatar') === '1') {
+                $hasChanges = true;
+            }
+
+            if (!$hasChanges) {
+                return response()->json([
+                    'message' => 'Không có thay đổi nào để cập nhật.',
+                ], 400);
+            }
+
+            $updateData = $newData;
+
             if ($request->filled('password')) {
                 $updateData['password'] = Hash::make($request->password);
             }
 
-            if ($request->hasFile('avatar')) {
+            if ($request->input('reset_avatar') === '1') {
                 if ($user->avatar && $user->avatar !== 'default.png') {
-                    Storage::disk('public')->delete('avatars/' . $user->avatar);
+                    if (Storage::disk('public')->exists('avatars/' . $user->avatar)) {
+                        Storage::disk('public')->delete('avatars/' . $user->avatar);
+                    }
+                    $updateData['avatar'] = null;
+                }
+            } elseif ($request->hasFile('avatar')) {
+                if ($user->avatar && $user->avatar !== 'default.png') {
+                    if (Storage::disk('public')->exists('avatars/' . $user->avatar)) {
+                        Storage::disk('public')->delete('avatars/' . $user->avatar);
+                    }
                 }
                 $file = $request->file('avatar');
                 $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
@@ -277,13 +338,13 @@ class CrudUserController extends Controller
                 $updateData['avatar'] = $filename;
             }
 
-            // Cập nhật bản ghi
+            // Cập nhật thủ công updated_at để đảm bảo
+            $updateData['updated_at'] = now();
+
             $user->update($updateData);
 
-            // Chỉ admin được sửa role
             if ($request->has('role')) {
-                $userRole = $currentUser->roles()->where('name', 'admin')->first();
-                if (!$userRole) {
+                if (!$isAdmin) {
                     return response()->json([
                         'message' => 'Bạn không có quyền thay đổi vai trò.',
                     ], 403);
@@ -308,7 +369,6 @@ class CrudUserController extends Controller
                 'token' => $request->bearerToken(),
                 'timestamp' => now()->toDateTimeString(),
             ]);
-
             return response()->json([
                 'message' => 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
             ], 401);
@@ -346,7 +406,6 @@ class CrudUserController extends Controller
                 'error_message' => $e->getMessage(),
                 'timestamp' => now()->toDateTimeString(),
             ]);
-
             return response()->json([
                 'message' => 'Người dùng không tồn tại. Vui lòng tải lại trang.',
             ], 404);
@@ -358,7 +417,6 @@ class CrudUserController extends Controller
                 'stack_trace' => $e->getTraceAsString(),
                 'timestamp' => now()->toDateTimeString(),
             ]);
-
             return response()->json([
                 'message' => 'Có lỗi xảy ra khi cập nhật. Vui lòng thử lại sau.',
             ], 500);
@@ -372,7 +430,9 @@ class CrudUserController extends Controller
             $user = User::findOrFail($id);
 
             if ($user->avatar && $user->avatar !== 'default.png') {
-                Storage::disk('public')->delete('avatars/' . $user->avatar);
+                if (Storage::disk('public')->exists('avatars/' . $user->avatar)) {
+                    Storage::disk('public')->delete('avatars/' . $user->avatar);
+                }
             }
 
             $user->delete();
@@ -384,7 +444,6 @@ class CrudUserController extends Controller
                 'error_message' => $e->getMessage(),
                 'timestamp' => now()->toDateTimeString(),
             ]);
-
             return response()->json([
                 'message' => 'Hãy tải lại trang để xóa.',
             ], 404);
@@ -395,7 +454,6 @@ class CrudUserController extends Controller
                 'stack_trace' => $e->getTraceAsString(),
                 'timestamp' => now()->toDateTimeString(),
             ]);
-
             return response()->json([
                 'message' => 'Có lỗi xảy ra: ' . $e->getMessage(),
             ], 500);
