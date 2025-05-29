@@ -480,28 +480,28 @@ const UserList = () => {
   };
 
   const handleEditSubmit = useCallback(
-    async (confirmed) => {
-      if (!confirmed) {
-        setShowConfirm(false);
+  async (confirmed) => {
+    if (!confirmed) {
+      setShowConfirm(false);
+      return;
+    }
+
+    setShowConfirm(false);
+    setIsSubmitting(true);
+    setEditErrors(null);
+
+    const storedData = localStorage.getItem('userUpdated');
+    if (storedData) {
+      const updatedData = JSON.parse(storedData);
+      if (updatedData.userId === editForm.id && updatedData.updatedAt !== editForm.updated_at) {
+        toast.warn('Nội dung không khớp. Hãy tải lại trang.', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        setIsSubmitting(false);
         return;
       }
-
-      setShowConfirm(false);
-      setIsSubmitting(true);
-      setEditErrors(null);
-
-      const storedData = localStorage.getItem('userUpdated');
-      if (storedData) {
-        const updatedData = JSON.parse(storedData);
-        if (updatedData.userId === editForm.id && updatedData.updatedAt !== editForm.updated_at) {
-          toast.warn('Nội dung không khớp. Hãy tải lại trang.', {
-            position: 'top-right',
-            autoClose: 3000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      }
+    }
 
       if (!editForm.id) {
         setEditErrors({ id: ['ID là bắt buộc.'] });
@@ -576,128 +576,129 @@ const UserList = () => {
       }
 
       const previousAvatar = editForm.current_avatar;
-      const previousResetAvatar = editForm.reset_avatar;
+    const previousResetAvatar = editForm.reset_avatar;
 
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('Vui lòng đăng nhập lại.');
-        }
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Vui lòng đăng nhập lại.');
+      }
 
-        const formData = new FormData();
-        formData.append('username', editForm.username);
-        formData.append('email', editForm.email);
-        formData.append('phone', editForm.phone || '');
-        formData.append('city', editForm.city || '');
-        formData.append('bio', editForm.bio || '');
-        formData.append('role', editForm.role);
-        if (editForm.avatar instanceof File && !editForm.reset_avatar) {
-          formData.append('avatar', editForm.avatar);
-        }
-        if (editForm.reset_avatar) {
-          formData.append('reset_avatar', '1');
-        }
-        formData.append('updated_at', editForm.updated_at || '');
-        formData.append('_method', 'PUT');
+      const formData = new FormData();
+      formData.append('username', editForm.username);
+      formData.append('email', editForm.email);
+      formData.append('phone', editForm.phone || '');
+      formData.append('city', editForm.city || '');
+      formData.append('bio', editForm.bio || '');
+      formData.append('role', editForm.role);
+      if (editForm.avatar instanceof File && !editForm.reset_avatar) {
+        formData.append('avatar', editForm.avatar);
+      }
+      if (editForm.reset_avatar) {
+        formData.append('reset_avatar', '1');
+      }
+      formData.append('updated_at', editForm.updated_at || '');
+      formData.append('_method', 'PUT');
 
-        const postConfig = {
-          withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-            'Content-Type': 'multipart/form-data',
-            'Cache-Control': 'no-cache',
-          },
-        };
+      const postConfig = {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'multipart/form-data',
+          'Cache-Control': 'no-cache',
+        },
+      };
 
-        console.log('Sending update request:', {
-          username: editForm.username,
-          email: editForm.email,
-          phone: editForm.phone,
-          city: editForm.city,
-          bio: editForm.bio,
-          role: editForm.role,
-          updated_at: editForm.updated_at,
-          reset_avatar: editForm.reset_avatar,
-        });
+      console.log('Sending update request:', {
+        username: editForm.username,
+        email: editForm.email,
+        phone: editForm.phone,
+        city: editForm.city,
+        bio: editForm.bio,
+        role: editForm.role,
+        updated_at: editForm.updated_at,
+        reset_avatar: editForm.reset_avatar,
+      });
 
-        const response = await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, postConfig);
-        console.log('Update response:', response.data);
+      const response = await axios.post(`http://127.0.0.1:8000/api/update/${editForm.id}`, formData, postConfig);
+      console.log('Update response:', response.data);
 
-        toast.success('Cập nhật người dùng thành công!', { position: 'top-right', autoClose: 3000 });
+      toast.success('Cập nhật người dùng thành công!', { position: 'top-right', autoClose: 3000 });
 
-        if (response.data.user) {
-          setEditForm((prev) => ({
-            ...prev,
-            username: response.data.user.username || prev.username,
-            email: response.data.user.email || prev.email,
-            phone: normalizeToHalfWidth(response.data.user.phone) || prev.phone,
-            city: response.data.user.city || prev.city,
-            bio: response.data.user.bio || prev.bio,
-            role: response.data.user.roles?.[0]?.name || prev.role,
-            current_avatar: response.data.user.avatar || 'default.png',
-            updated_at: response.data.user.updated_at || prev.updated_at,
-            reset_avatar: false,
-            avatar: null,
-          }));
-
-          localStorage.setItem('userUpdated', JSON.stringify({
-            userId: editForm.id,
-            updatedAt: response.data.user.updated_at,
-          }));
-        }
-
-        setEditErrors(null);
-        setImageError(false);
-        await fetchUsers(currentPage);
-
-        const editModalEl = document.getElementById('editModal');
-        if (editModalEl) {
-          const modal = window.bootstrap.Modal.getInstance(editModalEl) || new window.bootstrap.Modal(editModalEl);
-          modal.hide();
-          document.querySelector('.modal-backdrop')?.remove();
-          document.body.classList.remove('modal-open');
-        }
-      } catch (err) {
-        console.error('Update user error:', err.response ? err.response.data : err.message);
+      if (response.data.user) {
         setEditForm((prev) => ({
           ...prev,
-          current_avatar: previousAvatar,
-          reset_avatar: previousResetAvatar,
+          username: response.data.user.username || prev.username,
+          email: response.data.user.email || prev.email,
+          phone: normalizeToHalfWidth(response.data.user.phone) || prev.phone,
+          city: response.data.user.city || prev.city,
+          bio: response.data.user.bio || prev.bio,
+          role: response.data.user.roles?.[0]?.name || prev.role,
+          current_avatar: response.data.user.avatar || 'default.png',
+          updated_at: response.data.user.updated_at || prev.updated_at,
+          reset_avatar: false,
+          avatar: null,
         }));
 
-        if (err.response?.status === 401) {
-          localStorage.removeItem('token');
-          toast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
-          navigate('/login');
-        } else if (err.response?.status === 409) {
-          toast.error('Nội dung không khớp. Hãy tải lại trang.', { position: 'top-right', autoClose: 3000 });
-        } else if (err.response?.status === 422 && err.response.data?.errors) {
-          setEditErrors(err.response.data.errors);
-          if (err.response.data.errors.username) {
-            toast.error('Tên người dùng đã tồn tại. Vui lòng chọn tên khác.', { position: 'top-right', autoClose: 3000 });
-          } else if (err.response.data.errors.email) {
-            toast.error('Email đã tồn tại. Vui lòng chọn email khác.', { position: 'top-right', autoClose: 3000 });
-          } else if (err.response.data.errors.avatar) {
-            toast.error('File ảnh không hợp lệ. Vui lòng chọn file JPEG/PNG/JPG/GIF dưới 2MB.', {
-              position: 'top-right',
-              autoClose: 3000,
-            });
-          } else {
-            toast.error(Object.values(err.response.data.errors).flat()[0], { position: 'top-right', autoClose: 3000 });
-          }
-        } else {
-          toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật người dùng.', {
-            position: 'top-right',
-            autoClose: 3000,
-          });
-        }
-      } finally {
-        setIsSubmitting(false);
+        localStorage.setItem('userUpdated', JSON.stringify({
+          userId: editForm.id,
+          updatedAt: response.data.user.updated_at,
+        }));
       }
-    },
-    [editForm, fetchUsers, currentPage, navigate]
-  );
+
+      setEditErrors(null);
+      setImageError(false);
+      await fetchUsers(currentPage);
+
+      const editModalEl = document.getElementById('editModal');
+      if (editModalEl) {
+        const modal = window.bootstrap.Modal.getInstance(editModalEl) || new window.bootstrap.Modal(editModalEl);
+        modal.hide();
+        document.querySelector('.modal-backdrop')?.remove();
+        document.body.classList.remove('modal-open');
+      }
+    } catch (err) {
+      console.error('Update user error:', err.response ? err.response.data : err.message);
+      setEditForm((prev) => ({
+        ...prev,
+        current_avatar: previousAvatar, // Revert to previous avatar on error
+        reset_avatar: previousResetAvatar, // Revert reset_avatar flag
+      }));
+
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        toast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
+        navigate('/login');
+      } else if (err.response?.status === 409) {
+        toast.error('Nội dung không khớp. Hãy tải lại trang.', { position: 'top-right', autoClose: 3000 });
+      } else if (err.response?.status === 422 && err.response.data?.errors) {
+        setEditErrors(err.response.data.errors);
+        if (err.response.data.errors.avatar) {
+          // Differentiate between avatar validation and deletion errors
+          const errorMessage = err.response.data.errors.avatar[0].includes('delete')
+            ? 'Không thể xóa ảnh đại diện. Vui lòng thử lại.'
+            : 'File ảnh không hợp lệ. Vui lòng chọn file JPEG/PNG/JPG/GIF dưới 2MB.';
+          toast.error(errorMessage, { position: 'top-right', autoClose: 3000 });
+        } else if (err.response.data.errors.username) {
+          toast.error('Tên người dùng đã tồn tại. Vui lòng chọn tên khác.', { position: 'top-right', autoClose: 3000 });
+        } else if (err.response.data.errors.email) {
+          toast.error('Email đã tồn tại. Vui lòng chọn email khác.', { position: 'top-right', autoClose: 3000 });
+        } else {
+          toast.error(Object.values(err.response.data.errors).flat()[0], { position: 'top-right', autoClose: 3000 });
+        }
+      } else {
+        toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật người dùng.', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  },
+  [editForm, fetchUsers, currentPage, navigate]
+);
 
   const handleDelete = useCallback(
     async (id) => {

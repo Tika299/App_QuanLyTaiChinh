@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Thêm useRef
 import axios from 'axios';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import GoalList from './GoalList';
 import FlashMessage from './FlashMessage';
 import Header from './Header';
 import Slider from './Slider';
+import 'bootstrap/dist/css/bootstrap.min.css'; // Đảm bảo nhập Bootstrap CSS
 
 // Hàm chuyển đổi full-width sang half-width
 const normalizeToHalfWidth = (value) => {
@@ -53,6 +52,82 @@ const Goals = () => {
   });
   const [deleteGoalId, setDeleteGoalId] = useState('');
   const [errors, setErrors] = useState({});
+  const toastRef = useRef(null); // Thêm toastRef
+
+  // Hàm hiển thị toast thông báo
+  const showToast = (message, type = 'success') => {
+    const toastContainer = toastRef.current;
+    if (!toastContainer) return;
+
+    const toastId = `toast-${Date.now()}`;
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    const bsToast = new window.bootstrap.Toast(toast, { delay: 3000 });
+    bsToast.show();
+
+    toast.addEventListener('hidden.bs.toast', () => {
+      toast.remove();
+    });
+  };
+
+  // Hàm hiển thị toast xác nhận
+  const showConfirmToast = (message, onConfirm) => {
+    const toastContainer = toastRef.current;
+    if (!toastContainer) return;
+
+    const toastId = `toast-confirm-${Date.now()}`;
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast align-items-center text-white bg-warning border-0';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <div class="ms-auto me-2 m-auto">
+          <button type="button" class="btn btn-sm btn-success me-2" id="${toastId}-confirm">Xác nhận</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="toast" id="${toastId}-cancel">Hủy</button>
+        </div>
+      </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    const bsToast = new window.bootstrap.Toast(toast, { autohide: false });
+    bsToast.show();
+
+    const confirmButton = document.getElementById(`${toastId}-confirm`);
+    const cancelButton = document.getElementById(`${toastId}-cancel`);
+
+    confirmButton.addEventListener('click', () => {
+      onConfirm();
+      bsToast.hide();
+    });
+
+    toast.addEventListener('hidden.bs.toast', () => {
+      toast.remove();
+    });
+  };
 
   useEffect(() => {
     fetchGoals();
@@ -64,7 +139,7 @@ const Goals = () => {
       await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
-        toast.error('Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
+        showToast('Vui lòng đăng nhập lại.', 'danger');
         window.location.href = '/login';
         return;
       }
@@ -75,12 +150,12 @@ const Goals = () => {
       });
       setGoals(response.data.data.map(goal => ({
         ...goal,
-        target_amount: normalizeToHalfWidth(String(goal.target_amount)), // Chuẩn hóa target_amount
+        target_amount: normalizeToHalfWidth(String(goal.target_amount)),
       })));
       setTotalPages(response.data.last_page);
     } catch (error) {
       console.error('Fetch goals error:', error.response?.data || error.message);
-      toast.error('Lỗi khi tải danh sách mục tiêu.', { position: 'top-right', autoClose: 3000 });
+      showToast('Lỗi khi tải danh sách mục tiêu.', 'danger');
     }
   };
 
@@ -89,7 +164,7 @@ const Goals = () => {
       await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
       const token = localStorage.getItem('token');
       if (!token) {
-        toast.error('Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
+        showToast('Vui lòng đăng nhập lại.', 'danger');
         window.location.href = '/login';
         return;
       }
@@ -101,7 +176,7 @@ const Goals = () => {
       setCategories(response.data);
     } catch (error) {
       console.error('Fetch categories error:', error.response?.data || error.message);
-      toast.error('Lỗi khi tải danh sách danh mục.', { position: 'top-right', autoClose: 3000 });
+      showToast('Lỗi khi tải danh sách danh mục.', 'danger');
     }
   };
 
@@ -112,19 +187,13 @@ const Goals = () => {
 
   const handleAddChange = (e) => {
     const { name, value } = e.target;
-    const normalizedValue = name === 'target_amount' ? normalizeToHalfWidth(value) : value; // Chuẩn hóa target_amount
+    const normalizedValue = name === 'target_amount' ? normalizeToHalfWidth(value) : value;
     if (name === 'name' && value.length > 50) {
-      toast.error('Tên mục tiêu không được vượt quá 50 ký tự.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Tên mục tiêu không được vượt quá 50 ký tự.', 'danger');
       return;
     }
     if (name === 'note' && value.length > 1000) {
-      toast.error('Ghi chú không được vượt quá 1000 ký tự.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Ghi chú không được vượt quá 1000 ký tự.', 'danger');
       return;
     }
     setAddFormData({ ...addFormData, [name]: normalizedValue });
@@ -133,7 +202,6 @@ const Goals = () => {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
 
-    // Kiểm tra trống
     if (
       !addFormData.name ||
       !addFormData.target_amount ||
@@ -141,75 +209,66 @@ const Goals = () => {
       !addFormData.contribution_type ||
       !addFormData.category_id
     ) {
-      toast.error('Vui lòng điền đầy đủ các trường bắt buộc.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Vui lòng điền đầy đủ các trường bắt buộc.', 'danger');
       return;
     }
 
-    // Kiểm tra định dạng số tiền
     if (isNaN(addFormData.target_amount) || addFormData.target_amount <= 0) {
-      toast.error('Số tiền mục tiêu phải là số dương.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Số tiền mục tiêu phải là số dương.', 'danger');
       return;
     }
 
-    if (!window.confirm('Bạn có muốn thêm mục tiêu này không?')) {
-      return;
-    }
+    showConfirmToast(
+      'Bạn có muốn thêm mục tiêu này không?',
+      async () => {
+        try {
+          await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+          const token = localStorage.getItem('token');
+          if (!token) {
+            showToast('Vui lòng đăng nhập lại.', 'danger');
+            window.location.href = '/login';
+            return;
+          }
 
-    try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
-        window.location.href = '/login';
-        return;
+          const payload = {
+            name: addFormData.name,
+            target_amount: parseFloat(addFormData.target_amount),
+            contribution_period: addFormData.contribution_period,
+            contribution_type: addFormData.contribution_type,
+            deadline: addFormData.deadline || null,
+            category_id: parseInt(addFormData.category_id),
+            note: addFormData.note || null,
+          };
+
+          const response = await axios.post('http://localhost:8000/api/goals', payload, {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          });
+          showToast('Đã thêm mục tiêu!', 'success');
+          fetchGoals();
+          setActiveForm(null);
+          setAddFormData({
+            name: '',
+            target_amount: '',
+            contribution_period: '',
+            contribution_type: '',
+            deadline: '',
+            category_id: '',
+            note: '',
+          });
+          setErrors({});
+        } catch (error) {
+          console.error('Add goal error:', error.response?.data || error.message);
+          if (error.response?.data?.errors) {
+            setErrors(error.response.data.errors);
+            const errorMessages = Object.values(error.response.data.errors).flat().join(' ');
+            showToast(`Lỗi: ${errorMessages}`, 'danger');
+          } else {
+            showToast(error.response?.data?.error || 'Có lỗi xảy ra khi thêm mục tiêu.', 'danger');
+          }
+        }
       }
-
-      const payload = {
-        name: addFormData.name,
-        target_amount: parseFloat(addFormData.target_amount),
-        contribution_period: addFormData.contribution_period,
-        contribution_type: addFormData.contribution_type,
-        deadline: addFormData.deadline || null,
-        category_id: parseInt(addFormData.category_id),
-        note: addFormData.note || null,
-      };
-
-      const response = await axios.post('http://localhost:8000/api/goals', payload, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-      });
-      toast.success('Đã thêm mục tiêu!', { position: 'top-right', autoClose: 3000 });
-      fetchGoals();
-      setActiveForm(null);
-      setAddFormData({
-        name: '',
-        target_amount: '',
-        contribution_period: '',
-        contribution_type: '',
-        deadline: '',
-        category_id: '',
-        note: '',
-      });
-      setErrors({});
-    } catch (error) {
-      console.error('Add goal error:', error.response?.data || error.message);
-      if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
-        const errorMessages = Object.values(error.response.data.errors).flat().join(' ');
-        toast.error(`Lỗi: ${errorMessages}`, { position: 'top-right', autoClose: 3000 });
-      } else {
-        toast.error(error.response?.data?.error || 'Có lỗi xảy ra khi thêm mục tiêu.', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-      }
-    }
+    );
   };
 
   const handleEditGoalChange = (e) => {
@@ -220,7 +279,7 @@ const Goals = () => {
       setEditFormData({
         goal_id: goalId,
         name: goal.name || '',
-        target_amount: normalizeToHalfWidth(String(goal.target_amount)) || '', // Chuẩn hóa target_amount
+        target_amount: normalizeToHalfWidth(String(goal.target_amount)) || '',
         contribution_period: goal.contribution_period || '',
         contribution_type: goal.contribution_type || '',
         deadline: goal.deadline || '',
@@ -233,19 +292,13 @@ const Goals = () => {
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    const normalizedValue = name === 'target_amount' ? normalizeToHalfWidth(value) : value; // Chuẩn hóa target_amount
+    const normalizedValue = name === 'target_amount' ? normalizeToHalfWidth(value) : value;
     if (name === 'name' && value.length > 50) {
-      toast.error('Tên mục tiêu không được vượt quá 50 ký tự.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Tên mục tiêu không được vượt quá 50 ký tự.', 'danger');
       return;
     }
     if (name === 'note' && value.length > 1000) {
-      toast.error('Ghi chú không được vượt quá 1000 ký tự.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Ghi chú không được vượt quá 1000 ký tự.', 'danger');
       return;
     }
     setEditFormData({ ...editFormData, [name]: normalizedValue });
@@ -254,7 +307,6 @@ const Goals = () => {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
 
-    // Kiểm tra trống
     if (
       !editFormData.goal_id ||
       !editFormData.name ||
@@ -263,123 +315,115 @@ const Goals = () => {
       !editFormData.contribution_type ||
       !editFormData.category_id
     ) {
-      toast.error('Vui lòng điền đầy đủ các trường bắt buộc.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Vui lòng điền đầy đủ các trường bắt buộc.', 'danger');
       return;
     }
 
-    // Kiểm tra định dạng số tiền
     if (isNaN(editFormData.target_amount) || editFormData.target_amount <= 0) {
-      toast.error('Số tiền mục tiêu phải là số dương.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      showToast('Số tiền mục tiêu phải là số dương.', 'danger');
       return;
     }
 
-    if (!window.confirm('Bạn có muốn sửa mục tiêu này không?')) {
-      return;
-    }
+    showConfirmToast(
+      'Bạn có muốn sửa mục tiêu này không?',
+      async () => {
+        try {
+          await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+          const token = localStorage.getItem('token');
+          if (!token) {
+            showToast('Vui lòng đăng nhập lại.', 'danger');
+            window.location.href = '/login';
+            return;
+          }
 
-    try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
-        window.location.href = '/login';
-        return;
+          const formattedUpdatedAt = editFormData.updated_at
+            ? new Date(editFormData.updated_at).toISOString().replace('T', ' ').slice(0, 19)
+            : null;
+
+          const payload = {
+            name: editFormData.name,
+            target_amount: parseFloat(editFormData.target_amount),
+            contribution_period: editFormData.contribution_period,
+            contribution_type: editFormData.contribution_type,
+            deadline: editFormData.deadline || null,
+            category_id: parseInt(editFormData.category_id),
+            note: editFormData.note || null,
+            updated_at: formattedUpdatedAt,
+          };
+
+          const response = await axios.put(`http://localhost:8000/api/goals/${editFormData.goal_id}`, payload, {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          });
+          showToast('Đã cập nhật mục tiêu!', 'success');
+          fetchGoals();
+          setActiveForm(null);
+          setEditFormData({
+            goal_id: '',
+            name: '',
+            target_amount: '',
+            contribution_period: '',
+            contribution_type: '',
+            deadline: '',
+            category_id: '',
+            note: '',
+            updated_at: '',
+          });
+          setErrors({});
+        } catch (error) {
+          console.error('Edit goal error:', error.response?.data || error.message);
+          if (error.response?.data?.errors) {
+            setErrors(error.response.data.errors);
+            const errorMessages = Object.values(error.response.data.errors).flat().join(' ');
+            showToast(`Lỗi: ${errorMessages}`, 'danger');
+          } else if (error.response?.status === 409) {
+            showToast('Hãy tải lại trang để cập nhật.', 'danger');
+            setTimeout(() => window.location.reload(), 2000);
+          } else {
+            showToast(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật mục tiêu.', 'danger');
+          }
+        }
       }
-
-      const formattedUpdatedAt = editFormData.updated_at
-        ? new Date(editFormData.updated_at).toISOString().replace('T', ' ').slice(0, 19)
-        : null;
-
-      const payload = {
-        name: editFormData.name,
-        target_amount: parseFloat(editFormData.target_amount),
-        contribution_period: editFormData.contribution_period,
-        contribution_type: editFormData.contribution_type,
-        deadline: editFormData.deadline || null,
-        category_id: parseInt(editFormData.category_id),
-        note: editFormData.note || null,
-        updated_at: formattedUpdatedAt,
-      };
-
-      const response = await axios.put(`http://localhost:8000/api/goals/${editFormData.goal_id}`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-      });
-      toast.success('Đã cập nhật mục tiêu!', { position: 'top-right', autoClose: 3000 });
-      fetchGoals();
-      setActiveForm(null);
-      setEditFormData({
-        goal_id: '',
-        name: '',
-        target_amount: '',
-        contribution_period: '',
-        contribution_type: '',
-        deadline: '',
-        category_id: '',
-        note: '',
-        updated_at: '',
-      });
-      setErrors({});
-    } catch (error) {
-      console.error('Edit goal error:', error.response?.data || error.message);
-      if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
-        const errorMessages = Object.values(error.response.data.errors).flat().join(' ');
-        toast.error(`Lỗi: ${errorMessages}`, { position: 'top-right', autoClose: 3000 });
-      } else if (error.response?.status === 409) {
-        toast.error('Hãy tải lại trang để cập nhật.', { position: 'top-right', autoClose: 3000 });
-        setTimeout(() => window.location.reload(), 2000);
-      } else {
-        toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật mục tiêu.', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-      }
-    }
+    );
   };
 
   const handleDeleteSubmit = async (e) => {
     e.preventDefault();
 
     if (!deleteGoalId) {
-      toast.error('Vui lòng chọn mục tiêu để xóa.', { position: 'top-right', autoClose: 3000 });
+      showToast('Vui lòng chọn mục tiêu để xóa.', 'danger');
       return;
     }
 
-    if (deleteGoalId === 'all' && !window.confirm('Bạn chắc chắn muốn xóa TẤT CẢ mục tiêu? Hành động này không thể khôi phục!')) {
-      return;
-    } else if (deleteGoalId !== 'all' && !window.confirm('Bạn chắc chắn muốn xóa mục tiêu này?')) {
-      return;
-    }
+    showConfirmToast(
+      deleteGoalId === 'all'
+        ? 'Bạn chắc chắn muốn xóa TẤT CẢ mục tiêu? Hành động này không thể khôi phục!'
+        : 'Bạn chắc chắn muốn xóa mục tiêu này?',
+      async () => {
+        try {
+          await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
+          const token = localStorage.getItem('token');
+          if (!token) {
+            showToast('Vui lòng đăng nhập lại.', 'danger');
+            window.location.href = '/login';
+            return;
+          }
 
-    try {
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie', { withCredentials: true });
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Vui lòng đăng nhập lại.', { position: 'top-right', autoClose: 3000 });
-        window.location.href = '/login';
-        return;
+          const url = deleteGoalId === 'all' ? 'http://localhost:8000/api/goals/delete-all' : `http://localhost:8000/api/goals/${deleteGoalId}`;
+          await axios.delete(url, {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          });
+          showToast('Đã xóa mục tiêu!', 'success');
+          fetchGoals();
+          setActiveForm(null);
+          setDeleteGoalId('');
+        } catch (error) {
+          console.error('Delete goal error:', error.response?.data || error.message);
+          showToast('Có lỗi xảy ra khi xóa mục tiêu.', 'danger');
+        }
       }
-
-      const url = deleteGoalId === 'all' ? 'http://localhost:8000/api/goals/delete-all' : `http://localhost:8000/api/goals/${deleteGoalId}`;
-      await axios.delete(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-      });
-      toast.success('Đã xóa mục tiêu!', { position: 'top-right', autoClose: 3000 });
-      fetchGoals();
-      setActiveForm(null);
-      setDeleteGoalId('');
-    } catch (error) {
-      console.error('Delete goal error:', error.response?.data || error.message);
-      toast.error('Có lỗi xảy ra khi xóa mục tiêu.', { position: 'top-right', autoClose: 3000 });
-    }
+    );
   };
 
   return (
@@ -678,7 +722,7 @@ const Goals = () => {
             </div>
             <button type="submit" className="btn btn-danger mt-2">Xóa</button>
           </form>
-          <ToastContainer />
+          <div className="toast-container position-fixed top-0 end-0 p-3" ref={toastRef}></div>
         </div>
       </div>
     </div>
