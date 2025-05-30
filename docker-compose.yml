@@ -10,6 +10,12 @@ services:
       - db-data:/var/lib/mysql
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 
   frontend:
     build:
@@ -26,8 +32,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    expose:
+      - "9000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
@@ -36,6 +45,7 @@ services:
       - DB_DATABASE=laravel
       - DB_USERNAME=laravel_user
       - DB_PASSWORD=laravel_password
+    restart: unless-stopped
 
   nginx:
     build:

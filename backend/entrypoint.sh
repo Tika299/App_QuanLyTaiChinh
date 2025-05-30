@@ -1,5 +1,12 @@
 #!/bin/sh
 
+
+# Chờ MySQL sẵn sàng
+until mysql -h"$DB_HOST" -u"$DB_USERNAME" -p"$DB_PASSWORD" -e "SELECT 1;" "$DB_DATABASE"; do
+  echo "Waiting for MySQL at $DB_HOST..."
+  sleep 2
+done
+
 # Kiểm tra xem file marker đã tồn tại chưa
 MARKER_FILE=/var/www/storage/.initialized
 
